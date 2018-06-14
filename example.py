@@ -1,31 +1,9 @@
+#!/usr/bin/env python3
 import argparse
 import logging
 import pprint
 
-from pgdumplib import toc
-
-
-class Archive:
-
-    def __init__(self, directory):
-        self.directory = directory
-        self.toc = toc.ToC('{}/toc.dat'.format(directory))
-
-    @property
-    def dbname(self):
-        return self.toc.dbname
-
-    @property
-    def dump_version(self):
-        return self.toc.dump_version
-
-    @property
-    def server_version(self):
-        return self.toc.server_version
-
-    @property
-    def timestamp(self):
-        return self.toc.timestamp
+from pgdumplib import directory
 
 
 def parse_cli_args():
@@ -49,7 +27,7 @@ def main():
         level = logging.INFO
     logging.basicConfig(level=level)
 
-    reader = Archive(args.directory[0])
+    reader = directory.Reader(args.directory[0])
     print('Header: {}'.format(reader.toc.header))
     print('Database: {}'.format(reader.toc.dbname))
     print('Archive Timestamp: {}'.format(reader.timestamp))
@@ -58,8 +36,6 @@ def main():
     for dump_id, entry in reader.toc.entries.items():
         if entry.section == 'Data' and entry.desc == 'TABLE DATA':
             pprint.pprint(entry)
-
-
 
 
 if __name__ == '__main__':

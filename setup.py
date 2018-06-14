@@ -6,8 +6,7 @@ from pgdumplib import __version__
 setuptools.setup(
     name='pgdumplib',
     version=__version__,
-    description='Library for accessing "custom" formatted PostgreSQL backups '
-                'created with pg_dump.',
+    description='Library for PostgreSQL backups created with pg_dump',
     author='Gavin M. Roy',
     author_email='gavinmroy@gmail.com',
     url='https://github.com/gmr/pgdumplib',

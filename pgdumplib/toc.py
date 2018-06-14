@@ -25,6 +25,7 @@ Entry = collections.namedtuple(
 
 
 class ToC:
+    """Read the table of contents into named tuples."""
 
     def __init__(self, filename):
         if not path.exists(filename):
