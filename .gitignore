@@ -1,0 +1,16 @@
+coverage.xml
+nosetests.xml
+*.egg
+*.egg-info
+*.pyc
+*.pyo
+/.coverage
+/build/
+/dist/
+/downloads/
+/env/
+/htmlcov/
+env2
+env3
+.idea
+docs/_build
