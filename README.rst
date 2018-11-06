@@ -7,10 +7,11 @@ Currently supports directory based dumps and full ToC decoding.
 Example Usage
 -------------
 
-.. code:: bash
+.. code::
+
     pg_dump -s -Fd -f foo.dump
 
-.. code:: bash
+.. code::
 
     import pprint
 
