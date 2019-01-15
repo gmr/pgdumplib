@@ -33,9 +33,13 @@ def main():
     print('Archive Timestamp: {}'.format(reader.timestamp))
     print('Server Version: {}'.format(reader.server_version))
     print('Dump Version: {}'.format(reader.dump_version))
-    for dump_id, entry in reader.toc.entries.items():
-        if entry.section == 'Data' and entry.desc == 'TABLE DATA':
-            pprint.pprint(entry)
+
+    types = set([])
+
+    for entry in reader.toc.entries.items():
+        types.add(entry.desc.lower())
+
+    pprint.pprint(types)
 
 
 if __name__ == '__main__':

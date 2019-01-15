@@ -25,6 +25,5 @@ Example Usage
     print('Server Version: {}'.format(reader.server_version))
     print('Dump Version: {}'.format(reader.dump_version))
 
-    for dump_id, entry in reader.toc.entries.items():
-        print(dump_id)
+    for entry in reader.toc.entries.items():
         pprint.pprint(entry)

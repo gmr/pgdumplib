@@ -19,8 +19,8 @@ Header = collections.namedtuple(
     'Header', ['vmaj', 'vmin', 'vrev', 'intsize', 'offsize', 'format'])
 
 Entry = collections.namedtuple(
-    'Entry', ['had_dumper', 'table_oid', 'oid', 'tag', 'desc', 'section',
-              'defn', 'drop_stmt', 'copy_stmt', 'namespace',
+    'Entry', ['dump_id', 'had_dumper', 'table_oid', 'oid', 'tag', 'desc',
+              'section', 'defn', 'drop_stmt', 'copy_stmt', 'namespace',
               'tablespace', 'owner', 'with_oids', 'dependencies'])
 
 
@@ -64,8 +64,8 @@ class ToC:
         return values
 
     def _read_entry(self):
-        dump_id = self._read_int()
         entry = Entry(
+            self._read_int(),
             self._read_int(),
             self._read_bytes().decode('utf-8'),
             self._read_bytes().decode('utf-8'),
@@ -83,7 +83,7 @@ class ToC:
         offset = self._read_int()  # Offset for data alignment
         if offset:
             self.handle.read(offset)
-        return dump_id, entry
+        return entry
 
     def _read_entries(self):
         return dict([self._read_entry() for _i in range(0, self._read_int())])
