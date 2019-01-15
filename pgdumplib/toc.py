@@ -86,7 +86,7 @@ class ToC:
         return entry
 
     def _read_entries(self):
-        return dict([self._read_entry() for _i in range(0, self._read_int())])
+        return [self._read_entry() for _i in range(0, self._read_int())]
 
     def _read_header(self):
         data = self.handle.read(11)

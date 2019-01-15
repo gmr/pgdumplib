@@ -36,7 +36,7 @@ def main():
 
     types = set([])
 
-    for entry in reader.toc.entries.items():
+    for entry in reader.toc.entries:
         types.add(entry.desc.lower())
 
     pprint.pprint(types)
