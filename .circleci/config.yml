@@ -1,7 +1,8 @@
 version: "2.1"
 jobs:
   build:
-    machine: true
+    machine:
+      image: ubuntu-1604:201903-01
     working_directory: ~/repo
     steps:
       - checkout
@@ -9,7 +10,7 @@ jobs:
           name: "Set Python Version"
           command: |
             pyenv versions
-            pyenv global 3.7.0
+            pyenv global 3.7.2
       - restore_cache:
           keys:
             - v1-dependencies-{{ checksum "requires/testing.txt" }}
