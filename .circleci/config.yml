@@ -10,7 +10,7 @@ jobs:
           name: "Set Python Version"
           command: |
             pyenv versions
-            pyenv global 3.7.2
+            pyenv global 3.7.0
       - restore_cache:
           keys:
             - v1-dependencies-{{ checksum "requires/testing.txt" }}
