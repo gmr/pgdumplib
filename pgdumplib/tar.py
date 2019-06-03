@@ -8,7 +8,11 @@ Implements the Dump class for tar based archives
 import pathlib
 import tarfile
 
-from pgdumplib import models, reader
+from pgdumplib import reader
+
+
+class Dump(reader.Dump):
+    pass
 
 
 def load(filepath):
@@ -28,5 +32,4 @@ def load(filepath):
     with tarfile.open(path, 'r') as handle:
         tarinfo = handle.getmember('toc.dat')
         toc = handle.extractfile(tarinfo)
-        rdr = reader.Reader(toc)
-        return models.Dump(str(path), rdr.read_toc())
+        return Dump(str(path), reader.ToC(toc).read())

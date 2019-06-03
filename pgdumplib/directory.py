@@ -7,7 +7,11 @@ Implements the Dump class for Directory based
 """
 import pathlib
 
-from pgdumplib import models, reader
+from pgdumplib import reader
+
+
+class Dump(reader.Dump):
+    pass
 
 
 def load(filepath):
@@ -26,5 +30,4 @@ def load(filepath):
         raise ValueError('Missing ToC @ {!r}'.format(path))
 
     with open(toc, 'rb') as handle:
-        rdr = reader.Reader(handle)
-        return models.Dump(str(path), rdr.read_toc())
+        return Dump(str(path), reader.ToC(handle).read())

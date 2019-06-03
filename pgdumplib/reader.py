@@ -13,10 +13,20 @@ from pgdumplib import constants, models
 LOGGER = logging.getLogger(__name__)
 
 
-class Reader:
-    """Common base for reading in a pg_dump file"""
+class Dump:
+    """Dump Object containing data about the dump and includes methods for
+    reading data out of the dump.
+
+    """
+    def __init__(self, path, toc):
+        self.path = path
+        self.toc = toc
+
+
+class ToC:
+    """Common base for reading the Table of Contents from a Dump file"""
     def __init__(self, handle):
-        """Initialize the Reader, loading in the header
+        """Initialize the ToC Reader, loading in the header
 
          :param file-object handle: The file handle to read from
          :raises: :exc:`ValueError`
@@ -29,7 +39,7 @@ class Reader:
                 'Unsupported backup version: {}.{}.{}'.format(
                     *self.header.version))
 
-    def read_toc(self):
+    def read(self):
         """Read the Table of Contents from the handle.
 
         :rtype: pgdumplib.models.ToC
@@ -84,7 +94,7 @@ class Reader:
         :rtype: pgdumplib.models.Entry
 
         """
-        args = [
+        entry = models.Entry(
             self._read_int(),  # Dump ID
             bool(self._read_int()),  # Has Dumper
             self._read_bytes().decode('utf-8'),  # Table OID
@@ -101,17 +111,11 @@ class Reader:
             self._read_bytes() == b'true',  # With OIDs
             self._read_dependencies(),  # Dependencies
             self.handle.tell(),   # Current Position
-            self._read_int()  # Number of bytes with data
-        ]
-
-        if args[-1] > 0:
-            self.handle.seek(args[-1], io.SEEK_CUR)
-
-        # Extra field defined in custom format
-        args.append(self._read_uint() if self.header.format == 'Custom'
-                    else None)
-
-        return models.Entry(*args)
+            self._read_int(),  # Number of bytes with data
+            0)  # Extra data
+        if entry.data_length:
+            self.handle.seek(entry.data_length, io.SEEK_CUR)
+        return entry
 
     def _read_entries(self):
         """Read in all of the entries from the Dump.
