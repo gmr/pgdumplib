@@ -44,7 +44,7 @@ Example Usage
 .. |Status| image:: https://circleci.com/gh/gmr/pgdumplib/tree/master.svg?style=svg
    :target: https://circleci.com/gh/gmr/pgdumplib/tree/master
 
-.. |Coverage| image:: https://img.shields.io/codecov/c/github/gmr/pgdumplib.svg?
+.. |Coverage| image:: https://codecov.io/gh/gmr/pgdumplib/branch/master/graph/badge.svg
    :target: https://codecov.io/github/gmr/pgdumplib?branch=master
 
 .. |License| image:: https://img.shields.io/pypi/l/pgdumplib.svg?
