@@ -16,7 +16,7 @@ def load(filepath):
 
     :param str filepath: The path to the dump to load
     :raises: :exc:`ValueError`
-    :rtype: pgdumplib.modules.Dump
+    :rtype: pgdumplib.models.Dump
 
     """
     path = pathlib.Path(filepath)
