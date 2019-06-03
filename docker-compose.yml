@@ -11,4 +11,6 @@ services:
     ports:
       - 5432
     volumes:
-      - ./build/data:/data
+      - type: bind
+        source: ./build/data
+        target: /data

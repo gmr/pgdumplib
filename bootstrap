@@ -58,7 +58,7 @@ then
 fi
 
 rm -rf build
-mkdir -p build
+mkdir -p build build/data
 
 # Stop any running instances and clean up after them, then pull images
 docker-compose down --volumes --remove-orphans
@@ -73,6 +73,9 @@ docker-compose exec postgres /usr/bin/pg_dump -Fc -U postgres -f /data/dump.cust
 docker-compose exec postgres /usr/bin/pg_dump -Fd -U postgres -f /data/dump.directory -d postgres
 docker-compose exec postgres /usr/bin/pg_dump -Ft -U postgres -f /data/dump.tar -d postgres
 report_done
+
+docker-compose exec postgres ls -al /data
+ls -al build/data
 
 cat > build/test-environment<<EOF
 export PGHOST=${TEST_HOST}
