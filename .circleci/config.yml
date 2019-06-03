@@ -39,4 +39,4 @@ jobs:
           command: |
             . env/bin/activate
             pip install codecov
-            codecov  --file build/.coverage
+            codecov  --file build/coverage.xml
