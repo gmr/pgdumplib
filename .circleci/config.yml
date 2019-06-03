@@ -34,3 +34,9 @@ jobs:
             . env/bin/activate
             nosetests
             flake8 --output build/flake8.txt --tee
+      - run:
+          name: upload coverage
+          command: |
+            . env/bin/activate
+            pip install codecov
+            codecov  --file build/.coverage
