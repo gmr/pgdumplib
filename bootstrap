@@ -74,6 +74,11 @@ docker-compose exec postgres /usr/bin/pg_dump -Fd -U postgres -f /data/dump.dire
 docker-compose exec postgres /usr/bin/pg_dump -Ft -U postgres -f /data/dump.tar -d postgres
 report_done
 
+printf "Fixing permissions ... "
+docker-compose exec postgres chmod a+rx /data/dump.directory
+docker-compose exec postgres chmod -R a+r /data
+report_done
+
 docker-compose exec postgres ls -al /data
 ls -al build/data
 
