@@ -15,15 +15,15 @@ Example Usage
 
     import pprint
 
-    from pgdumplib import directory
+    import pgdumplib
 
+    dump = pgdumplib.load('/path/to/dump')
 
-    reader = directory.Reader('foo.dump')
-    print('Header: {}'.format(reader.toc.header))
-    print('Database: {}'.format(reader.toc.dbname))
-    print('Archive Timestamp: {}'.format(reader.timestamp))
-    print('Server Version: {}'.format(reader.server_version))
-    print('Dump Version: {}'.format(reader.dump_version))
+    print('Header: {}'.format(dump.toc.header))
+    print('Database: {}'.format(dump.toc.dbname))
+    print('Archive Timestamp: {}'.format(dump.timestamp))
+    print('Server Version: {}'.format(dump.server_version))
+    print('Dump Version: {}'.format(dump.dump_version))
 
-    for entry in reader.toc.entries:
+    for entry in dump.toc.entries:
         pprint.pprint(entry)

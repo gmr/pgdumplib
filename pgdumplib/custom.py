@@ -21,10 +21,6 @@ def load(filepath):
     if not path.exists():
         raise ValueError('Path {!r} does not exist'.format(path))
 
-    toc = path / 'toc.dat'
-    if not toc.exists():
-        raise ValueError('Missing ToC @ {!r}'.format(path))
-
-    with open(toc, 'rb') as handle:
+    with open(path, 'rb') as handle:
         rdr = reader.Reader(handle)
         return models.Dump(str(path), rdr.read_toc())
