@@ -25,7 +25,14 @@ jobs:
           paths:
             - ./eenv
           key: v1-dependencies-{{ checksum "requires/testing.txt" }}
-      - run: ./bootstrap
+      - run:
+          name: bootstrap
+          command: |
+            ./bootstrap
+            docker-compose exec postgres /bin/chmod -R 0755 /data
+            docker-compose exec postgres /bin/chmod -R 0644 /data/*
+            docker-compose exec postgres /bin/ls -al /data
+            ls -al build/data
       - run:
           name: run tests
           command: |
