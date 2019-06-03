@@ -51,7 +51,7 @@ class Reader:
 
         """
         return struct.unpack('B', self.handle.read(1))[0]
-    
+
     def _read_bytes(self):
         """Read in a byte stream
 
@@ -63,7 +63,7 @@ class Reader:
             value = self.handle.read(length)
             return value
         return b''
-    
+
     def _read_dependencies(self):
         """Read in the dependencies for an entry.
 
@@ -77,7 +77,7 @@ class Reader:
                 break
             values.append(int(value))
         return values
-    
+
     def _read_entry(self):
         """Read in an individual entry.
 
@@ -147,7 +147,7 @@ class Reader:
         sign = self._read_byte()
         value = self._read_uint()
         return -value if sign else value
-    
+
     def _read_uint(self):
         """Read in an unsigned integer
 
@@ -161,17 +161,17 @@ class Reader:
                 value += (bv << bs)
             bs += 8
         return value
-    
+
     def _read_timestamp(self):
         """Read in the timestamp from handle.
 
         :rtype: datetime.datetime
 
         """
-        seconds, minutes, hour, day, month, year, _dst = (
+        seconds, minutes, hour, day, month, year = (
             self._read_int(), self._read_int(), self._read_int(),
-            self._read_int(), self._read_int() + 1, self._read_int() + 1900,
-            self._read_int())
+            self._read_int(), self._read_int() + 1, self._read_int() + 1900)
+        self._read_int()  # DST flag, no way to handle this at the moment
         return datetime.datetime(
             year, month, day, hour, minutes, seconds,
             tzinfo=datetime.timezone.utc)

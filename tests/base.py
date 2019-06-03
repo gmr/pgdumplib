@@ -94,7 +94,8 @@ class TestCase(unittest.TestCase):
         self.assertEqual(len(self.dump.toc.entries), self.info.entry_count)
 
     def test_toc_server_version(self):
-        self.assertEqual(self.dump.toc.server_version, self.info.server_version)
+        self.assertEqual(
+            self.dump.toc.server_version, self.info.server_version)
 
     def test_toc_timestamp(self):
         self.assertEqual(self.dump.toc.timestamp, self.info.timestamp)
