@@ -24,7 +24,6 @@ jobs:
           paths:
             - ./eenv
           key: v1-dependencies-{{ checksum "requires/testing.txt" }}
-      - setup_remote_docker
       - run: ./bootstrap
       - run:
           name: run tests
