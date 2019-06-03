@@ -69,9 +69,9 @@ wait_for_healthy_containers 1
 docker-compose exec postgres /usr/bin/pgbench -i -U postgres postgres
 
 printf "Creating test backups ... "
-docker-compose exec postgres /usr/bin/pg_dump -Fa -U postgres -f /data/archive.tar -d postgres
 docker-compose exec postgres /usr/bin/pg_dump -Fc -U postgres -f /data/custom.dump -d postgres
 docker-compose exec postgres /usr/bin/pg_dump -Fd -U postgres -f /data/directory -d postgres
+docker-compose exec postgres /usr/bin/pg_dump -Ft -U postgres -f /data/archive.tar -d postgres
 report_done
 
 cat > build/test-environment<<EOF
