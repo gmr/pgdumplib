@@ -9,6 +9,7 @@ import random
 import faker
 from faker.providers import address, internet, misc, person
 import psycopg2
+from psycopg2 import errors
 
 LOGGER = logging.getLogger(__name__)
 LOGGING_FORMAT = '[%(asctime)-15s] %(levelname)-8s %(message)s'
@@ -168,7 +169,7 @@ def generate_user(fake, locale_fake, locale, icon_oid):
         'created_at': created_at,
         'last_modified_at': last_modified_at,
         'state': fake.random_element(STATES),
-        'email': fake.safe_email(),
+        'email': locale_fake.safe_email(),
         'name': name,
         'surname': surname,
         'display_name': display_name,
@@ -201,8 +202,13 @@ def generate_users(args, cursor):
         locale_fake = get_locale_faker(locale)
 
         # Create the User
-        cursor.execute(
-            USER_SQL, generate_user(fake, locale_fake, locale, icon_oid))
+        try:
+            cursor.execute(
+                USER_SQL, generate_user(fake, locale_fake, locale, icon_oid))
+        except errors.UniqueViolation as err:
+            LOGGER.error('Error creating user: %s', err)
+            continue
+
         user = cursor.fetchone()
         LOGGER.info('Created user %s', user[0])
         created_at = user[1]
