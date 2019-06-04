@@ -90,9 +90,6 @@ printf "Fixing permissions ... "
 docker-compose exec postgres chmod -R a+r /data
 report_done
 
-docker-compose exec postgres ls -al /data
-ls -al build/data
-
 cat > build/test-environment<<EOF
 export PGHOST=${TEST_HOST}
 export PGPORT=${PGPORT}
