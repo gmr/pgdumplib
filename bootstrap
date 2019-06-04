@@ -66,7 +66,18 @@ docker-compose up -d --quiet-pull
 
 wait_for_healthy_containers 1
 
+PGPORT=$(get_exposed_port postgres 5432)
+
+echo "Running pgbench ... "
 docker-compose exec postgres /usr/bin/pgbench -i -U postgres postgres
+
+printf "Loading fixture schema ... "
+docker-compose exec postgres /usr/bin/psql -U postgres -d postgres -q -o /dev/null -f /fixtures/schema.sql
+report_done
+
+printf "Generating fixture data ... "
+bin/generate-fixture-data.py -U postgres -h ${TEST_HOST} -p ${PGPORT} -d postgres
+report_done
 
 printf "Creating test backups ... "
 docker-compose exec postgres /usr/bin/pg_dump -Fc -U postgres -f /data/dump.not-compressed -d postgres --compress=0
@@ -84,9 +95,10 @@ ls -al build/data
 
 cat > build/test-environment<<EOF
 export PGHOST=${TEST_HOST}
-export PGPORT=$(get_exposed_port postgres 5432)
+export PGPORT=${PGPORT}
 export PGDATABASE=postgres
 export PGUSER=postgres
+export POSTGRES_URI=postgresql://postgres@${PGPORT}/
 EOF
 
 printf "\nBootstrap complete\n\nDon't forget to \". build/test-environment\"\n"

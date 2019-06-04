@@ -1,5 +1,6 @@
 arrow
 coverage
+faker
 flake8
 flake8-comprehensions
 flake8-deprecated
@@ -10,3 +11,4 @@ flake8-rst-docstrings
 flake8-sql
 flake8-tuple
 nose
+psycopg2
