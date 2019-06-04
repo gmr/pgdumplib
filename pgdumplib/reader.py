@@ -6,6 +6,7 @@ import dataclasses
 import datetime
 import decimal
 import io
+import ipaddress
 import logging
 import struct
 import uuid
@@ -197,7 +198,14 @@ class Dump:
                 return decimal.Decimal(column)
             except ValueError:
                 pass
-
+        try:
+            return ipaddress.ip_address(column)
+        except ValueError:
+            pass
+        try:
+            return ipaddress.ip_network(column)
+        except ValueError:
+            pass
         try:
             return iso8601.parse_date(column)
         except iso8601.ParseError:
