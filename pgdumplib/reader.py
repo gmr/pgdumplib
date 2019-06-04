@@ -7,6 +7,7 @@ import datetime
 import io
 import logging
 import struct
+import zlib
 
 from pgdumplib import constants, exceptions, models
 
@@ -95,6 +96,38 @@ class Dump:
         """
         return handle.read(1), _read_int(handle, self.toc.header.intsize)
 
+    def _read_data_compressed(self, handle):
+        """Read a compressed data block
+
+        :param file object handle:
+        :rtype: str
+
+        """
+        buffer = io.BytesIO()
+        chunk = b''
+        decompress = zlib.decompressobj()
+        block_length = constants.ZLIB_IN_SIZE
+        while block_length == constants.ZLIB_IN_SIZE:
+            block_length = _read_int(handle, self.toc.header.intsize)
+            chunk += handle.read(constants.ZLIB_IN_SIZE)
+            buffer.write(decompress.decompress(chunk))
+            chunk = decompress.unconsumed_tail
+        return buffer.getvalue().decode('utf-8')
+
+    def _read_data_uncompressed(self, handle):
+        """Read an uncompressed data block
+
+        :param file object handle:
+
+        """
+        buffer = io.BytesIO()
+        while True:
+            block_length = _read_int(handle, self.toc.header.intsize)
+            if not block_length:
+                break
+            buffer.write(handle.read(block_length))
+        return buffer.getvalue().decode('utf-8')
+
     def _read_entry_data(self, entry, handle):
         """Read the data from the entry
 
@@ -119,14 +152,15 @@ class Dump:
             raise ValueError('Dump IDs do not match')
 
         if block_type == constants.BLK_DATA:
-            while True:
-                block_length = _read_int(handle, self.toc.header.intsize)
-                if block_length == 0:
+            if self.toc.compression:
+                buffer = self._read_data_compressed(handle)
+            else:
+                buffer = self. _read_data_uncompressed(handle)
+            for line in buffer.split('\n'):
+                if line.startswith('\\.'):
                     break
-                data = handle.read(block_length).decode('utf-8')[:-1]
-                if data.startswith('\\.'):
-                    break
-                yield data.split('\t')
+                yield line
+
         else:
             raise ValueError(
                 'Unsupported block type: {}'.format(block_type))

@@ -117,13 +117,34 @@ class TestCase(unittest.TestCase):
             for line in self.dump.read_data('public', str(uuid.uuid4())):
                 LOGGER.debug('Line: %r', line)
 
+
+class CompressedTestCase(TestCase):
+
+    PATH = 'dump.compressed'
+
+
+class NoDataTestCase(TestCase):
+
+    HAS_DATA = False
+    PATH = 'dump.no-data'
+
+    def test_read_dump_data(self):
+        with self.assertRaises(exceptions.EntityNotFoundError):
+            for line in self.dump.read_data('public', 'pgbench_accounts'):
+                LOGGER.debug('Line: %r', line)
+
+
+class DataOnlyTestCase(TestCase):
+
+    PATH = 'dump.data-only'
+
+
+class ErrorsTestCase(unittest.TestCase):
+
     def test_missing_file_raises_value_error(self):
         path = pathlib.Path(tempfile.gettempdir()) / str(uuid.uuid4())
         with self.assertRaises(ValueError):
             pgdumplib.load(path)
-
-
-class ErrorsTestCase(unittest.TestCase):
 
     def test_min_version_failure_raises(self):
         min_ver = (constants.MIN_VER[0],

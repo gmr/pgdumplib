@@ -9,6 +9,7 @@ Installation
 ------------
 
 .. code::
+
     pip install pg_dumplib
 
 Example Usage
