@@ -1,12 +1,17 @@
-"""Base common TestCase"""
+"""Test Reader"""
 import dataclasses
 import logging
 import pathlib
 import re
 import subprocess
+import tempfile
 import unittest
+from unittest import mock
+import uuid
 
 import arrow
+import pgdumplib
+from pgdumplib import constants, exceptions
 
 LOGGER = logging.getLogger(__name__)
 
@@ -40,7 +45,7 @@ class DumpInfo:
 
 class TestCase(unittest.TestCase):
 
-    PATH = 'dump.sql'
+    PATH = 'dump.not-compressed'
 
     @classmethod
     def setUpClass(cls) -> None:
@@ -53,7 +58,7 @@ class TestCase(unittest.TestCase):
         LOGGER.debug('Dump: %r', self.dump)
 
     def _read_dump(self):
-        raise NotImplementedError
+        return pgdumplib.load(self.local_path)
 
     @classmethod
     def _read_dump_info(cls, remote_path) -> DumpInfo:
@@ -99,3 +104,41 @@ class TestCase(unittest.TestCase):
 
     def test_toc_timestamp(self):
         self.assertEqual(self.dump.toc.timestamp, self.info.timestamp)
+
+    def test_read_dump_data(self):
+        data = []
+        for line in self.dump.read_data('public', 'pgbench_accounts'):
+            data.append(line)
+        self.assertEqual(len(data), 100000)
+
+    def test_read_dump_entity_not_found(self):
+        with self.assertRaises(exceptions.EntityNotFoundError):
+            for line in self.dump.read_data('public', str(uuid.uuid4())):
+                print(line)
+
+    def test_missing_file_raises_value_error(self):
+        path = pathlib.Path(tempfile.gettempdir()) / str(uuid.uuid4())
+        with self.assertRaises(ValueError):
+            pgdumplib.load(path)
+
+
+class ErrorsTestCase(unittest.TestCase):
+
+    def test_min_version_failure_raises(self):
+        min_ver = (constants.MIN_VER[0],
+                   constants.MIN_VER[1] + 10,
+                   constants.MIN_VER[2])
+
+        with mock.patch('pgdumplib.constants.MIN_VER', min_ver):
+            with self.assertRaises(ValueError):
+                pgdumplib.load('build/data/dump.not-compressed')
+
+    def test_invalid_dump_file(self):
+        with tempfile.NamedTemporaryFile('wb') as temp:
+            temp.write(b'PGBAD')
+            with open('build/data/dump.not-compressed', 'rb') as handle:
+                handle.read(5)
+                temp.write(handle.read())
+
+            with self.assertRaises(ValueError):
+                pgdumplib.load(temp.name)

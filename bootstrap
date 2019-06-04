@@ -69,13 +69,13 @@ wait_for_healthy_containers 1
 docker-compose exec postgres /usr/bin/pgbench -i -U postgres postgres
 
 printf "Creating test backups ... "
-docker-compose exec postgres /usr/bin/pg_dump -Fc -U postgres -f /data/dump.custom -d postgres
-docker-compose exec postgres /usr/bin/pg_dump -Fd -U postgres -f /data/dump.directory -d postgres
-docker-compose exec postgres /usr/bin/pg_dump -Ft -U postgres -f /data/dump.tar -d postgres
+docker-compose exec postgres /usr/bin/pg_dump -Fc -U postgres -f /data/dump.not-compressed -d postgres --compress=0
+docker-compose exec postgres /usr/bin/pg_dump -Fc -U postgres -f /data/dump.compressed -d postgres --compress=9
+docker-compose exec postgres /usr/bin/pg_dump -Fc -U postgres -f /data/dump.no-data -d postgres --compress=0 -s
+docker-compose exec postgres /usr/bin/pg_dump -Fc -U postgres -f /data/dump.data-only -d postgres --compress=0 -a
 report_done
 
 printf "Fixing permissions ... "
-docker-compose exec postgres chmod a+rx /data/dump.directory
 docker-compose exec postgres chmod -R a+r /data
 report_done
 

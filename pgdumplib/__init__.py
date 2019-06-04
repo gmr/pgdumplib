@@ -5,14 +5,13 @@ pgdumplib
 """
 import pathlib
 
-from pgdumplib import custom, directory, tar
+from pgdumplib import reader
 
 version = '0.3.0'
 
 
 def load(filepath):
-    """Load a pg_dump file from disk, supporting custom, directory, or tar
-    format.
+    """Load a pg_dump file created with -Fd from disk
 
     :param str filepath: The path to the dump to load
     :raises: :exc:`ValueError`
@@ -20,9 +19,8 @@ def load(filepath):
 
     """
     path = pathlib.Path(filepath)
-    if path.is_dir():
-        return directory.load(path)
-    elif path.name.endswith('.tar'):
-        return tar.load(path)
-    else:
-        return custom.load(path)
+    if not path.exists():
+        raise ValueError('Path {!r} does not exist'.format(path))
+
+    with open(path, 'rb') as handle:
+        return reader.Dump(str(path), reader.ToC(handle).read())

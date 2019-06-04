@@ -8,9 +8,56 @@ import io
 import logging
 import struct
 
-from pgdumplib import constants, models
+from pgdumplib import constants, exceptions, models
 
 LOGGER = logging.getLogger(__name__)
+
+
+def _read_byte(handle):
+    """Read in an individual byte.
+
+    :rtype: int
+
+    """
+    return struct.unpack('B', handle.read(1))[0]
+
+
+def _read_int(handle, intsize):
+    """Read in a signed integer
+
+    :rtype: int
+
+    """
+    sign = _read_byte(handle)
+    bs, bv, value = 0, 0, 0
+    for offset in range(0, intsize):
+        bv = _read_byte(handle) & 0xff
+        if bv != 0:
+            value += (bv << bs)
+        bs += 8
+    return -value if sign else value
+
+
+def _skip_data(handle, intsize):
+    """Skip data from current file position.
+    Data blocks are formatted as an integer length, followed by data.
+    A zero length denoted the end of the block.
+
+    :param handle:
+    :param int intsize:
+    :return:
+
+    """
+    block_length, buff_len = _read_int(handle, intsize), 0
+    while block_length:
+        if block_length > buff_len:
+            buff_len = block_length
+        data_in = handle.read(block_length)
+        if len(data_in) != block_length:
+            LOGGER.error('Failure to read full block (%i != %i)',
+                         len(data_in), block_length)
+            raise ValueError()
+        block_length = _read_int(handle, intsize)
 
 
 class Dump:
@@ -21,6 +68,68 @@ class Dump:
     def __init__(self, path, toc):
         self.path = path
         self.toc = toc
+
+    def __repr__(self):
+        return '<Dump path={!r} format={!r} timestamp={!r}>'.format(
+            self.path, self.toc.header.format, self.toc.timestamp.isoformat())
+
+    def read_data(self, namespace, table):
+        """Iterator that returns data for the given namespace and table
+
+        :param str namespace: The namespace/schema for the table
+        :param str table: The table name
+        :raises: :exc:`pgdumplib.exceptions.EntityNotFoundError`
+
+        """
+        for entry in [e for e in self.toc.entries if e.section == 'Data']:
+            if entry.namespace == namespace and entry.tag == table:
+                with open(self.path, 'rb') as handle:
+                    for line in self._read_entry_data(entry, handle):
+                        yield line
+                return
+        raise exceptions.EntityNotFoundError(namespace=namespace, table=table)
+
+    def _read_block_header(self, handle):
+        """Read the block header in.
+
+        """
+        return handle.read(1), _read_int(handle, self.toc.header.intsize)
+
+    def _read_entry_data(self, entry, handle):
+        """Read the data from the entry
+
+        :param pgdumplib.models.Entry entry: The entry to read
+
+        """
+        if entry.data_state == constants.K_OFFSET_NO_DATA:
+            return
+        elif entry.data_state == constants.K_OFFSET_POS_NOT_SET:
+            block_type, dump_id = self._read_block_header(handle)
+            while block_type != constants.EOF and dump_id != entry.dump_id:
+                if block_type in [constants.BLK_DATA, constants.BLK_BLOBS]:
+                    _skip_data(handle, self.toc.header.intsize)
+                else:
+                    LOGGER.warning('Unknown block type: %r', block_type)
+                block_type, dump_id = self._read_block_header(handle)
+        else:
+            handle.seek(entry.offset, io.SEEK_SET)
+
+        block_type, dump_id = self._read_block_header(handle)
+        if dump_id != entry.dump_id:
+            raise ValueError('Dump IDs do not match')
+
+        if block_type == constants.BLK_DATA:
+            while True:
+                block_length = _read_int(handle, self.toc.header.intsize)
+                if block_length == 0:
+                    break
+                data = handle.read(block_length).decode('utf-8')[:-1]
+                if data.startswith('\\.'):
+                    break
+                yield data.split('\t')
+        else:
+            raise ValueError(
+                'Unsupported block type: {}'.format(block_type))
 
 
 class ToC:
@@ -47,8 +156,8 @@ class ToC:
         """
         return models.ToC(
             self.header,
-            self._read_int() != 0,  # Compression
-            self._read_timestamp(),
+            self._read_int() != 0,               # Compression
+            self._read_timestamp(),              # Timestamp
             self._read_bytes().decode('utf-8'),  # dbname
             self._read_bytes().decode('utf-8'),  # Server Name
             self._read_bytes().decode('utf-8'),  # pg_dump Version
@@ -94,7 +203,7 @@ class ToC:
         :rtype: pgdumplib.models.Entry
 
         """
-        entry = models.Entry(
+        args = [
             self._read_int(),  # Dump ID
             bool(self._read_int()),  # Has Dumper
             self._read_bytes().decode('utf-8'),  # Table OID
@@ -109,13 +218,13 @@ class ToC:
             self._read_bytes().decode('utf-8'),  # Tablespace
             self._read_bytes().decode('utf-8'),  # Owner
             self._read_bytes() == b'true',  # With OIDs
-            self._read_dependencies(),  # Dependencies
-            self.handle.tell(),   # Current Position
-            self._read_int(),  # Number of bytes with data
-            0)  # Extra data
-        if entry.data_length:
-            self.handle.seek(entry.data_length, io.SEEK_CUR)
-        return entry
+            self._read_dependencies()
+        ]
+        data_state, offset = self._read_offset()
+        args.append(data_state)
+        args.append(offset)
+        LOGGER.debug('Args: %r', args)
+        return models.Entry(*args)
 
     def _read_entries(self):
         """Read in all of the entries from the Dump.
@@ -149,22 +258,28 @@ class ToC:
 
         """
         sign = self._read_byte()
-        value = self._read_uint()
-        return -value if sign else value
-
-    def _read_uint(self):
-        """Read in an unsigned integer
-
-        :rtype: int
-
-        """
         bs, bv, value = 0, 0, 0
         for offset in range(0, self.header.intsize):
             bv = self._read_byte() & 0xff
             if bv != 0:
                 value += (bv << bs)
             bs += 8
-        return value
+        return -value if sign else value
+
+    def _read_offset(self):
+        """Read in the value for the length of the data stored in the file.
+
+        :rtype: int or None
+
+        """
+        if self.header.format != 'Custom':
+            return self._read_byte(), None
+        data_state = self._read_byte()
+        value = 0
+        for offset in range(0, self.header.offsize):
+            bv = self._read_byte()
+            value |= bv << (offset * 8)
+        return data_state, value
 
     def _read_timestamp(self):
         """Read in the timestamp from handle.

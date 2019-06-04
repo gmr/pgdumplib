@@ -41,9 +41,8 @@ class Entry:
     owner: str
     with_oids: bool
     dependencies: list
-    data_position: int
-    data_length: int
     data_state: int
+    offset: int
 
 
 @dataclasses.dataclass

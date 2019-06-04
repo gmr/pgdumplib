@@ -1,9 +1,7 @@
 pgdumplib
 =========
 
-Python3 library for working pg_dump based Postgres backups.
-
-Supports custom, directory, and tar formats.
+Python3 library for working with Postgres
 
 |Version| |Status| |Coverage| |License|
 
@@ -18,25 +16,22 @@ Example Usage
 
 .. code::
 
-    pg_dump -s -Fd -f foo.dump
+    pg_dump -s -Fd -f pgbench.dump
 
 .. code::
 
-    import pprint
-
     import pgdumplib
 
-    dump = pgdumplib.load('/path/to/dump')
+    dump = pgdumplib.load('pgbench.dump')
 
     print('Header: {}'.format(dump.toc.header))
     print('Database: {}'.format(dump.toc.dbname))
-    print('Archive Timestamp: {}'.format(dump.timestamp))
-    print('Server Version: {}'.format(dump.server_version))
-    print('Dump Version: {}'.format(dump.dump_version))
+    print('Archive Timestamp: {}'.format(dump.toc.timestamp))
+    print('Server Version: {}'.format(dump.toc.server_version))
+    print('Dump Version: {}'.format(dump.toc.dump_version))
 
-    for entry in dump.toc.entries:
-        pprint.pprint(entry)
-
+    for line in dump.read_data('public', 'pgbench_accounts'):
+        print(line)
 
 .. |Version| image:: https://img.shields.io/pypi/v/pgdumplib.svg?
    :target: https://pypi.python.org/pypi/pgdumplib
