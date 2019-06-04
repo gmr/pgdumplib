@@ -2,6 +2,8 @@
 pgdumplib specific exceptions
 
 """
+
+
 class PgDumpLibException(Exception):
     """Common Base Exception"""
 

@@ -10,6 +10,7 @@ from unittest import mock
 import uuid
 
 import arrow
+
 import pgdumplib
 from pgdumplib import constants, exceptions
 
@@ -114,7 +115,7 @@ class TestCase(unittest.TestCase):
     def test_read_dump_entity_not_found(self):
         with self.assertRaises(exceptions.EntityNotFoundError):
             for line in self.dump.read_data('public', str(uuid.uuid4())):
-                print(line)
+                LOGGER.debug('Line: %r', line)
 
     def test_missing_file_raises_value_error(self):
         path = pathlib.Path(tempfile.gettempdir()) / str(uuid.uuid4())
