@@ -1,26 +1,11 @@
-# coding=utf-8
 """
 Models
 ======
+The models represent the different data structures in a pg_dump file
 
 """
 import dataclasses
 import datetime
-
-
-@dataclasses.dataclass
-class Header:
-    """Represents the pg_dump archive header"""
-    vmaj: int
-    vmin: int
-    vrev: int
-    intsize: int
-    offsize: int
-    format: str
-
-    @property
-    def version(self):
-        return self.vmaj, self.vmin, self.vrev
 
 
 @dataclasses.dataclass
@@ -46,6 +31,26 @@ class Entry:
 
 
 @dataclasses.dataclass
+class Header:
+    """Represents the pg_dump archive header"""
+    vmaj: int
+    vmin: int
+    vrev: int
+    intsize: int
+    offsize: int
+    format: str
+
+    @property
+    def version(self):
+        """Return the version as a tuple to make version comparisons easier.
+
+        :rtype: tuple
+
+        """
+        return self.vmaj, self.vmin, self.vrev
+
+
+@dataclasses.dataclass
 class ToC:
     """Represents the Table of Contents"""
     header: Header
@@ -55,10 +60,3 @@ class ToC:
     server_version: str
     dump_version: str
     entries: list
-
-
-@dataclasses.dataclass
-class Dump:
-    """Represents a pg_dump file/archive/directory"""
-    path: str
-    toc: ToC

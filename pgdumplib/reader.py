@@ -167,7 +167,6 @@ class Dump:
                 if line.startswith('\\.'):
                     break
                 yield line
-
         else:
             raise ValueError(
                 'Unsupported block type: {}'.format(block_type))
