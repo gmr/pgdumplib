@@ -1,7 +1,7 @@
 pgdumplib
 =========
 
-Python3 library for working with Postgres
+Python3 library for working with pg_dump files
 
 |Version| |Status| |Coverage| |License|
 
