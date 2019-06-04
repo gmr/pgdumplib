@@ -17,6 +17,7 @@ LOGGER = logging.getLogger(__name__)
 def _read_byte(handle):
     """Read in an individual byte.
 
+    :param file object handle: The file handle to read the integer to
     :rtype: int
 
     """
@@ -26,6 +27,8 @@ def _read_byte(handle):
 def _read_int(handle, intsize):
     """Read in a signed integer
 
+    :param file object handle: The file handle to read the integer to
+    :param int intsize: The size of the integer to read
     :rtype: int
 
     """
@@ -44,8 +47,8 @@ def _skip_data(handle, intsize):
     Data blocks are formatted as an integer length, followed by data.
     A zero length denoted the end of the block.
 
-    :param handle:
-    :param int intsize:
+    :param file object handle: The file handle to skip data from
+    :param int intsize: The size of the integers in the dump file
     :return:
 
     """
@@ -91,7 +94,10 @@ class Dump:
         raise exceptions.EntityNotFoundError(namespace=namespace, table=table)
 
     def _read_block_header(self, handle):
-        """Read the block header in.
+        """Read the block header in
+
+        :param file object handle: The file handle to read data from
+        :rtype: bytes, int
 
         """
         return handle.read(1), _read_int(handle, self.toc.header.intsize)
@@ -99,7 +105,7 @@ class Dump:
     def _read_data_compressed(self, handle):
         """Read a compressed data block
 
-        :param file object handle:
+        :param file object handle: The file handle to read data from
         :rtype: str
 
         """
@@ -117,7 +123,7 @@ class Dump:
     def _read_data_uncompressed(self, handle):
         """Read an uncompressed data block
 
-        :param file object handle:
+        :param file object handle: The file handle to read data from
 
         """
         buffer = io.BytesIO()
@@ -132,6 +138,7 @@ class Dump:
         """Read the data from the entry
 
         :param pgdumplib.models.Entry entry: The entry to read
+        :param file object handle: The file handle to read data from
 
         """
         if entry.data_state == constants.K_OFFSET_NO_DATA:
@@ -257,7 +264,6 @@ class ToC:
         data_state, offset = self._read_offset()
         args.append(data_state)
         args.append(offset)
-        LOGGER.debug('Args: %r', args)
         return models.Entry(*args)
 
     def _read_entries(self):
@@ -306,8 +312,6 @@ class ToC:
         :rtype: int or None
 
         """
-        if self.header.format != 'Custom':
-            return self._read_byte(), None
         data_state = self._read_byte()
         value = 0
         for offset in range(0, self.header.offsize):
