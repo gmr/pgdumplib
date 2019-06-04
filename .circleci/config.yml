@@ -18,6 +18,7 @@ jobs:
       - run:
           name: install dependencies
           command: |
+            sudo apt-get install -y postgresql libpq-dev postgresql-client postgresql-client-common
             python3 -m venv env
             . env/bin/activate
             pip install -r requires/testing.txt
