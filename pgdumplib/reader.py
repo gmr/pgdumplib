@@ -188,9 +188,16 @@ class Dump:
         if column == '\\N':
             return None
         elif column.isnumeric():
-            return int(column)
+            try:
+                return int(column)
+            except ValueError:
+                pass
         elif column.isdecimal():
-            return decimal.Decimal(column)
+            try:
+                return decimal.Decimal(column)
+            except ValueError:
+                pass
+
         try:
             return iso8601.parse_date(column)
         except iso8601.ParseError:

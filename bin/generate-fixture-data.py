@@ -112,6 +112,7 @@ def configure_logging(args):
 
 
 def generate_address(fake, user_id, created_at):
+    """Generate a street address for the user"""
     last_modified_at = None
     if fake.boolean(chance_of_getting_true=25):
         last_modified_at = created_at + fake.time_delta(
@@ -167,7 +168,7 @@ def generate_user(fake, locale_fake, locale, icon_oid):
         'created_at': created_at,
         'last_modified_at': last_modified_at,
         'state': fake.random_element(STATES),
-        'email': fake.email(),
+        'email': fake.safe_email(),
         'name': name,
         'surname': surname,
         'display_name': display_name,
