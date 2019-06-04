@@ -4,10 +4,14 @@ Common Reader
 """
 import dataclasses
 import datetime
+import decimal
 import io
 import logging
 import struct
+import uuid
 import zlib
+
+import iso8601
 
 from pgdumplib import constants, exceptions, models
 
@@ -77,18 +81,19 @@ class Dump:
         return '<Dump path={!r} format={!r} timestamp={!r}>'.format(
             self.path, self.toc.header.format, self.toc.timestamp.isoformat())
 
-    def read_data(self, namespace, table):
+    def read_data(self, namespace, table, convert=False):
         """Iterator that returns data for the given namespace and table
 
         :param str namespace: The namespace/schema for the table
         :param str table: The table name
+        :param bool convert: Attempt to convert columns to native data types
         :raises: :exc:`pgdumplib.exceptions.EntityNotFoundError`
 
         """
         for entry in [e for e in self.toc.entries if e.section == 'Data']:
             if entry.namespace == namespace and entry.tag == table:
                 with open(self.path, 'rb') as handle:
-                    for line in self._read_entry_data(entry, handle):
+                    for line in self._read_entry_data(entry, handle, convert):
                         yield line
                 return
         raise exceptions.EntityNotFoundError(namespace=namespace, table=table)
@@ -134,11 +139,12 @@ class Dump:
             buffer.write(handle.read(block_length))
         return buffer.getvalue().decode('utf-8')
 
-    def _read_entry_data(self, entry, handle):
+    def _read_entry_data(self, entry, handle, convert):
         """Read the data from the entry
 
         :param pgdumplib.models.Entry entry: The entry to read
         :param file object handle: The file handle to read data from
+        :param bool convert: Attempt to convert the data to native types
 
         """
         if entry.data_state == constants.K_OFFSET_NO_DATA:
@@ -166,10 +172,44 @@ class Dump:
             for line in buffer.split('\n'):
                 if line.startswith('\\.'):
                     break
-                yield line
+                yield self._convert_row(line) if convert else line.split('\t')
         else:
             raise ValueError(
                 'Unsupported block type: {}'.format(block_type))
+
+    @staticmethod
+    def _convert_column(column):
+        """Attempt to convert the column from a string if appropriate
+
+        :param str column: The column to attempt to convert
+        :rtype: mixed
+
+        """
+        if column == '\\N':
+            return None
+        elif column.isnumeric():
+            return int(column)
+        elif column.isdecimal():
+            return decimal.Decimal(column)
+        try:
+            return iso8601.parse_date(column)
+        except iso8601.ParseError:
+            pass
+        try:
+            return uuid.UUID(column)
+        except ValueError:
+            pass
+        return column
+
+    def _convert_row(self, row):
+        """Split the fields and convert the columns to Python naturalized
+        data types.
+
+        :param str row: The row to convert
+        :rtype: list
+
+        """
+        return [self._convert_column(col) for col in row.split('\t')]
 
 
 class ToC:
