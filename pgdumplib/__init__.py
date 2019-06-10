@@ -6,8 +6,7 @@ pgdumplib
 import pathlib
 
 from pgdumplib import dump, reader
-
-version = '0.3.0'
+from pgdumplib.__version__ import version
 
 
 def load(filepath):
@@ -26,11 +25,7 @@ def load(filepath):
         return dump.Dump(str(path), reader.ToC(handle).read())
 
 
-def save(filepath, dump):
-    """Save a
-
-    :param str filepath: The path to the file to create
-    :param pgdumplib.reader.Dump dump: The dump object to write
-
-    """
-    pass
+__all__ = [
+    'load',
+    'version'
+]

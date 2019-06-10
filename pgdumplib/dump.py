@@ -9,9 +9,10 @@ import logging
 import uuid
 import zlib
 
-import iso8601
+import arrow
+from arrow import parser
 
-from pgdumplib import constants, exceptions, reader
+from pgdumplib import constants, exceptions, models, reader, writer
 
 LOGGER = logging.getLogger(__name__)
 
@@ -43,13 +44,102 @@ class Dump:
     reading data out of the dump.
 
     """
-    def __init__(self, path, toc):
+    def __init__(self, path, toc=None):
         self.path = path
-        self.toc = toc
+        self.toc = toc or models.ToC()
 
     def __repr__(self):
         return '<Dump path={!r} format={!r} timestamp={!r}>'.format(
             self.path, self.toc.header.format, self.toc.timestamp.isoformat())
+
+    def add_entry(self, namespace=None, tag=None,
+                  section=constants.SECTION_NONE, owner=None, desc=None,
+                  tablespace=None, defn=None, drop_stmt=None, copy_stmt=None,
+                  dependencies=None, dump_id=None):
+        """Add an entry to the dump
+
+        The `namespace`, `tag`, and `section` are required.
+
+        A :exc:`ValueError` will be raised if section is not one of
+        :const:`~pgdumplib.constants.SECTION_NONE`,
+        :const:`~pgdumplib.constants.SECTION_PRE_DATA`,
+        :const:`~pgdumplib.constants.SECTION_DATA`, or
+        :const:`~pgdumplib.constants.SECTION_POST_DATA`.
+
+        When adding data, is is advised to invoke :meth:`~Dump.add_data`
+        instead of invoking :meth:`~Dump.add_entry` directly.
+
+        If `dependencies` are specified, they will be validated and if a
+        `dump_id` is specified and no entry is found with that `dump_id`,
+        a :exc:`ValueError` will be raised.
+
+        Other omitted values will be set to the default values will be set to
+        the defaults specified in the :class:`~pgdumplib.models.Entry` class.
+
+        The `dump_id` will be auto-calculated based upon the existing entries
+        if it is not specified.
+
+        :param str namespace: The namespace of the entry
+        :param str tag: The name/table/relation/etc of the entry
+        :param str section: The section for the entry
+        :param str owner: The owner of the object in Postgres
+        :param str desc: The entry description
+        :param str tablespace: The tablespace to use
+        :param str defn: The DDL definition for the entry
+        :param drop_stmt: A drop statement used to drop the entry before
+        :param copy_stmt: A copy statement used when there is a corresponding
+            data section.
+        :param list dependencies: A list of dump_ids of objects that the entry
+            is dependent upon.
+        :param int dump_id: The dump id, will be auto-calculated if left empty
+        :raises: ValueError
+        :rtype: pgdumplib.models.Entry
+
+        """
+        if section not in constants.SECTIONS:
+            raise ValueError('Invalid section: {}'.format(section))
+
+        dump_ids = [e.dump_id for e in self.toc.entries]
+
+        for dependency in dependencies or []:
+            if dependency not in dump_ids:
+                raise ValueError(
+                    'Dependency dump_id {!r} not found'.format(dependency))
+
+        if not dump_id:
+            dump_id = max(dump_ids) + 1 if dump_ids else 1
+
+        self.toc.entries.append(models.Entry(
+            dump_id, False, None, None, tag, desc, section, defn, drop_stmt,
+            copy_stmt, namespace, tablespace, owner, False, dependencies))
+        return self.toc.entries[-1]
+
+    def get_entry(self, namespace, tag, section=constants.SECTION_PRE_DATA):
+        """Return the entry for the given namespace and tag
+
+        :param str namespace: The namespace of the entry
+        :param str tag: The tag/relation/table name
+        :param str section: The dump section the entry is for
+        :raises: ValueError
+        :rtype: pgdumplib.models.Entry or None
+
+        """
+        if section not in constants.SECTIONS:
+            raise ValueError('Invalid section: {}'.format(section))
+        for entry in [e for e in self.toc.entries if e.section == section]:
+            if entry.namespace == namespace and entry.tag == tag:
+                return entry
+
+    def get_entry_by_dump_id(self, dump_id):
+        """Return the entry for the given `dump_id`
+
+        :param int dump_id: The dump ID of the entry to return.
+        :rtype: pgdumplib.models.Entry or None
+
+        """
+        for entry in self.toc.entries:
+            if entry.dump_id == dump_id:
+                return entry
 
     def read_data(self, namespace, table, convert=False):
         """Iterator that returns data for the given namespace and table
@@ -60,13 +150,19 @@ class Dump:
         :raises: :exc:`pgdumplib.exceptions.EntityNotFoundError`
 
         """
-        for entry in [e for e in self.toc.entries if e.section == 'Data']:
+        for entry in [e for e in self.toc.entries
+                      if e.section == constants.SECTION_DATA]:
             if entry.namespace == namespace and entry.tag == table:
                 with open(self.path, 'rb') as handle:
                     for line in self._read_entry_data(entry, handle, convert):
                         yield line
                 return
         raise exceptions.EntityNotFoundError(namespace=namespace, table=table)
+
+    def save(self):
+        """Save the Dump file to `Dump.path`"""
+        with open(self.path, 'wb') as handle:
+            writer.Writer(handle).write(self)
 
     def _read_block_header(self, handle):
         """Read the block header in
@@ -176,8 +272,8 @@ class Dump:
         except ValueError:
             pass
         try:
-            return iso8601.parse_date(column)
-        except iso8601.ParseError:
+            return arrow.get(column).datetime
+        except parser.ParserError:
             pass
         try:
             return uuid.UUID(column)

@@ -33,7 +33,7 @@ def read_int(handle, intsize):
     sign = read_byte(handle)
     bs, bv, value = 0, 0, 0
     for offset in range(0, intsize):
-        bv = read_byte(handle) & 0xff
+        bv = read_byte(handle) & 0xFF
         if bv != 0:
             value += (bv << bs)
         bs += 8
@@ -89,41 +89,13 @@ class ToC:
         :rtype: list
 
         """
-        values = []
+        values = set({})
         while True:
             value = self._read_bytes()
             if not value:
                 break
-            values.append(int(value))
-        return values
-
-    def _read_entry(self):
-        """Read in an individual entry.
-
-        :rtype: pgdumplib.models.Entry
-
-        """
-        args = [
-            self._read_int(),  # Dump ID
-            bool(self._read_int()),  # Has Dumper
-            self._read_bytes().decode('utf-8'),  # Table OID
-            self._read_bytes().decode('utf-8'),  # OID
-            self._read_bytes().decode('utf-8'),  # Tag
-            self._read_bytes().decode('utf-8'),  # Desc
-            constants.SECTIONS[self._read_int() - 1],  # Section
-            self._read_bytes().decode('utf-8'),  # Definition
-            self._read_bytes().decode('utf-8'),  # Drop Statement
-            self._read_bytes().decode('utf-8'),  # Copy Statement
-            self._read_bytes().decode('utf-8'),  # Namespace
-            self._read_bytes().decode('utf-8'),  # Tablespace
-            self._read_bytes().decode('utf-8'),  # Owner
-            self._read_bytes() == b'true',  # With OIDs
-            self._read_dependencies()
-        ]
-        data_state, offset = self._read_offset()
-        args.append(data_state)
-        args.append(offset)
-        return models.Entry(*args)
+            values.add(int(value))
+        return sorted(list(values))
 
     def _read_entries(self):
         """Read in all of the entries from the Dump.
@@ -131,7 +103,36 @@ class ToC:
         :rtype: list()
 
         """
-        return [self._read_entry() for _i in range(0, self._read_int())]
+        entries = self._read_int()
+        LOGGER.debug('Reading %i entries', entries)
+        return [self._read_entry() for _i in range(0, entries)]
+
+    def _read_entry(self):
+        """Read in an individual entry.
+
+        :rtype: pgdumplib.models.Entry
+
+        """
+        LOGGER.debug('Reading entry')
+        kwargs = {
+            'dump_id': self._read_int(),
+            'had_dumper': bool(self._read_int()),
+            'table_oid': self._read_bytes().decode('utf-8') or None,
+            'oid': self._read_bytes().decode('utf-8') or None,
+            'tag': self._read_bytes().decode('utf-8') or None,
+            'desc': self._read_bytes().decode('utf-8') or None,
+            'section': constants.SECTIONS[self._read_int() - 1],
+            'defn': self._read_bytes().decode('utf-8') or None,
+            'drop_stmt': self._read_bytes().decode('utf-8') or None,
+            'copy_stmt': self._read_bytes().decode('utf-8') or None,
+            'namespace': self._read_bytes().decode('utf-8') or None,
+            'tablespace': self._read_bytes().decode('utf-8') or None,
+            'owner': self._read_bytes().decode('utf-8') or None,
+            'with_oids': self._read_bytes() == b'true',
+            'dependencies': self._read_dependencies()
+        }
+        kwargs['data_state'], kwargs['offset'] = self._read_offset()
+        return models.Entry(**kwargs)
 
     def _read_header(self):
         """Read in the dump header

@@ -3,19 +3,51 @@ pg_dump Constants
 =================
 
 """
-MAGIC = 'PGDMP'
-MIN_VER = (1, 12, 0)
-FORMATS = ['Unknown', 'Custom', 'Files', 'Tar', 'Null', 'Directory']
-SECTIONS = ['None', 'Pre-Data', 'Data', 'Post-Data']
+APPEAR_AS = '11.3'
 
 BLK_DATA = b'\x01'
 BLK_BLOBS = b'\x03'
+
+FORMAT_UNKNOWN = 0
+FORMAT_CUSTOM = 1
+FORMAT_FILES = 2
+FORMAT_TAR = 3
+FORMAT_NULL = 4
+FORMAT_DIRECTORY = 5
+
+FORMATS = [
+    FORMAT_UNKNOWN,
+    FORMAT_CUSTOM,
+    FORMAT_FILES,
+    FORMAT_TAR,
+    FORMAT_NULL,
+    FORMAT_DIRECTORY
+]
 
 EOF = -1
 
 K_OFFSET_POS_NOT_SET = 1
 K_OFFSET_POS_SET = 2
 K_OFFSET_NO_DATA = 3
+
+MAGIC = 'PGDMP'
+MIN_VER = (1, 12, 0)
+
+PGDUMP_STRFTIME_FMT = '%Y-%m-%d %H:%M:%S %Z'
+
+SECTION_NONE = 'None'
+SECTION_PRE_DATA = 'Pre-Data'
+SECTION_DATA = 'DATA'
+SECTION_POST_DATA = 'Post-Data'
+
+SECTIONS = [
+    SECTION_NONE,
+    SECTION_PRE_DATA,
+    SECTION_DATA,
+    SECTION_POST_DATA
+]
+
+VERSION = (1, 13, 0)
 
 ZLIB_OUT_SIZE = 4096
 ZLIB_IN_SIZE = 4096
