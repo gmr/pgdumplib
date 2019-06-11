@@ -3,10 +3,7 @@ pgdumplib
 =========
 
 """
-import pathlib
-
-from pgdumplib import dump, reader
-from pgdumplib.__version__ import version
+version = '0.3.0'
 
 
 def load(filepath):
@@ -17,15 +14,6 @@ def load(filepath):
     :rtype: pgdumplib.reader.Dump
 
     """
-    path = pathlib.Path(filepath)
-    if not path.exists():
-        raise ValueError('Path {!r} does not exist'.format(path))
+    from pgdumplib import dump
 
-    with open(path, 'rb') as handle:
-        return dump.Dump(str(path), reader.ToC(handle).read())
-
-
-__all__ = [
-    'load',
-    'version'
-]
+    return dump.Dump().load(filepath)

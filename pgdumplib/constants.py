@@ -8,6 +8,8 @@ APPEAR_AS = '11.3'
 BLK_DATA = b'\x01'
 BLK_BLOBS = b'\x03'
 
+BLOBS = 'BLOBS'
+
 EOF = -1
 
 FORMAT_UNKNOWN = 0

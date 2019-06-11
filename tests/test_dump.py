@@ -88,23 +88,23 @@ class TestCase(unittest.TestCase):
         self.assertIsNotNone(self.dump)
 
     def test_toc_compression(self):
-        self.assertEqual(self.dump.toc.compression, self.info.compression)
+        self.assertEqual(self.dump.compression, self.info.compression)
 
     def test_toc_dbname(self):
-        self.assertEqual(self.dump.toc.dbname, 'postgres')
+        self.assertEqual(self.dump.dbname, 'postgres')
 
     def test_toc_dump_version(self):
-        self.assertEqual(self.dump.toc.dump_version, self.info.pg_dump_version)
+        self.assertEqual(self.dump.dump_version, self.info.pg_dump_version)
 
     def test_toc_entry_count(self):
-        self.assertEqual(len(self.dump.toc.entries), self.info.entry_count)
+        self.assertEqual(len(self.dump.entries), self.info.entry_count)
 
     def test_toc_server_version(self):
         self.assertEqual(
-            self.dump.toc.server_version, self.info.server_version)
+            self.dump.server_version, self.info.server_version)
 
     def test_toc_timestamp(self):
-        self.assertEqual(self.dump.toc.timestamp, self.info.timestamp)
+        self.assertEqual(self.dump.timestamp, self.info.timestamp)
 
     def test_read_dump_data(self):
         data = []
