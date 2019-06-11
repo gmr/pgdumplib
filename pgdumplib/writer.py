@@ -5,8 +5,6 @@ Write pg_dump files using the custom format
 import logging
 import struct
 
-import arrow
-
 from pgdumplib import constants
 
 LOGGER = logging.getLogger(__name__)
@@ -31,7 +29,7 @@ class Writer:
 
         self._write_header()
         self._write_int(int(dump.toc.compression))
-        self._write_timestamp(arrow.now().datetime)
+        self._write_timestamp(dump.toc.timestamp)
         self._write_str(dump.toc.dbname)
         self._write_str(dump.toc.server_version)
         self._write_str(dump.toc.dump_version)

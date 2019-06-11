@@ -3,9 +3,10 @@ Common Reader
 
 """
 import dataclasses
-import datetime
 import logging
 import struct
+
+import arrow
 
 from pgdumplib import constants, models
 
@@ -113,7 +114,6 @@ class ToC:
         :rtype: pgdumplib.models.Entry
 
         """
-        LOGGER.debug('Reading entry')
         kwargs = {
             'dump_id': self._read_int(),
             'had_dumper': bool(self._read_int()),
@@ -182,6 +182,5 @@ class ToC:
             self._read_int(), self._read_int(), self._read_int(),
             self._read_int(), self._read_int() + 1, self._read_int() + 1900)
         self._read_int()  # DST flag, no way to handle this at the moment
-        return datetime.datetime(
-            year, month, day, hour, minutes, seconds,
-            tzinfo=datetime.timezone.utc)
+        return arrow.Arrow(
+            year, month, day, hour, minutes, seconds).to('local').datetime

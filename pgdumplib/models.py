@@ -8,6 +8,8 @@ import dataclasses
 import datetime
 import typing
 
+import arrow
+
 from pgdumplib import __version__, constants
 
 
@@ -59,7 +61,7 @@ class ToC:
     header: Header = dataclasses.field(default_factory=Header)
     compression: bool = False
     timestamp: datetime.datetime = dataclasses.field(
-        default_factory=datetime.datetime.utcnow)
+        default_factory=arrow.now)
     dbname: str = 'pgdumplib'
     server_version: str = '{} (pgdumplib {})'.format(
         constants.APPEAR_AS, __version__.version)
