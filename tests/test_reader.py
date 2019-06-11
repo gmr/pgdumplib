@@ -79,7 +79,7 @@ class TestCase(unittest.TestCase):
             elif key == 'entry_count':
                 data[key] = int(match[0])
             elif key == 'timestamp':
-                data[key] = arrow.get(match[0]).datetime
+                data[key] = arrow.get(match[0]).to('local').datetime
             else:
                 data[key] = match[0]
         return DumpInfo(**data)
