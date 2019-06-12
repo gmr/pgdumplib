@@ -1,6 +1,5 @@
 Version History
 ===============
-:orphan:
 
 +---------+------------+------------------------------------------------------------------+
 | Version | Date       | Release Notes                                                    |
@@ -17,4 +16,4 @@ Version History
 | 0.1.0   | 2019-01-15 | Initial release                                                  |
 +---------+------------+------------------------------------------------------------------+
 
--
+More specific release information can be found on `GitHub <https://github.com/gmr/pgdumplib/releases>`_
