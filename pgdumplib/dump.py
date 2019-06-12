@@ -70,8 +70,7 @@ class Dump:
         self.server_version = VERSION_INFO
         self.timestamp = arrow.now()
 
-        converter = converter or converters.DataConverter()
-
+        converter = converter or converters.DataConverter
         self._converter = converter()
         self._format = constants.FORMAT_CUSTOM
         self._handle = None
@@ -216,7 +215,7 @@ class Dump:
 
         self._read_header()
 
-        if constants.MIN_VER < self.version > constants.MAX_VER:
+        if not constants.MIN_VER <= self.version <= constants.MAX_VER:
             raise ValueError(
                 'Unsupported backup version: {}.{}.{}'.format(
                     *self.version))

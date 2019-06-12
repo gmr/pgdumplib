@@ -153,8 +153,15 @@ class ErrorsTestCase(unittest.TestCase):
         min_ver = (constants.MIN_VER[0],
                    constants.MIN_VER[1] + 10,
                    constants.MIN_VER[2])
-
+        LOGGER.debug('Setting pgdumplib.constants.MIN_VER to %s', min_ver)
         with mock.patch('pgdumplib.constants.MIN_VER', min_ver):
+            with self.assertRaises(ValueError):
+                pgdumplib.load('build/data/dump.not-compressed')
+
+    def test_max_version_failure_raises(self):
+        max_ver = (0, constants.MAX_VER[1], constants.MAX_VER[2])
+        LOGGER.debug('Setting pgdumplib.constants.MAX_VER to %s', max_ver)
+        with mock.patch('pgdumplib.constants.MAX_VER', max_ver):
             with self.assertRaises(ValueError):
                 pgdumplib.load('build/data/dump.not-compressed')
 

@@ -2,7 +2,7 @@ import dataclasses
 import unittest
 
 import pgdumplib
-from pgdumplib import constants, models
+from pgdumplib import constants, dump
 
 
 class SavedDumpTestCase(unittest.TestCase):
@@ -26,7 +26,7 @@ class SavedDumpTestCase(unittest.TestCase):
         self.assertFalse(self.saved.compression)
 
     def test_entries_mostly_match(self):
-        attrs = [e.name for e in dataclasses.fields(models.Entry)]
+        attrs = [e.name for e in dataclasses.fields(dump.Entry)]
         attrs.remove('offset')
         for offset, original in enumerate(self.original.entries):
             for attr in attrs:
