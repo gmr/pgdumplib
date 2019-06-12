@@ -2,17 +2,7 @@
 pgdumplib exposes a load method to create a :py:class:`~pgdumplib.dump.Dump`
 instance from a :command:`pg_dump` file created in the `custom` format.
 
-Once loaded, the table data in a dump is available to read using an iterator:
-
-.. code-block:: python
-
-    import pgdumplib
-    from pgdumplib import converters
-
-    dump = pgdumplib.load('path/to/dump', converters.SmartDataConverter)
-
-    for row in dump.read_data('public', 'my_table'):
-        print(row)
+See the :doc:`examples` page to see how to read a dump or create one.
 
 """
 version = '1.0.0'
