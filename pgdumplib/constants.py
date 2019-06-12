@@ -26,7 +26,9 @@ K_OFFSET_POS_SET = 2
 K_OFFSET_NO_DATA = 3
 
 MAGIC = 'PGDMP'
+
 MIN_VER = (1, 12, 0)
+MAX_VER = (1, 13, 0)
 
 PGDUMP_STRFTIME_FMT = '%Y-%m-%d %H:%M:%S %Z'
 

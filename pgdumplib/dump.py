@@ -16,6 +16,7 @@ import typing
 import zlib
 
 import arrow
+from dateutil import tz
 
 from pgdumplib import constants, converters, exceptions, models, version
 
@@ -64,7 +65,6 @@ class Dump:
         The `namespace`, `tag`, and `section` are required.
 
         A :exc:`ValueError` will be raised if section is not one of
-        :const:`~pgdumplib.constants.SECTION_NONE`,
         :const:`~pgdumplib.constants.SECTION_PRE_DATA`,
         :const:`~pgdumplib.constants.SECTION_DATA`, or
         :const:`~pgdumplib.constants.SECTION_POST_DATA`.
@@ -250,7 +250,6 @@ class Dump:
             buffer = self._read_data()
             yield oid, buffer
             oid = self._read_int()
-            LOGGER.info('Next OID: %r', oid)
 
     def _read_block_header(self) -> (bytes, int):
         """Read the block header in
@@ -343,6 +342,9 @@ class Dump:
         :raises: :exc:`ValueError`
 
         """
+        LOGGER.debug('Reading entry data for %i %s %s (%s) @ %i',
+                     entry.dump_id, entry.namespace, entry.tag, entry.desc,
+                     entry.offset)
         if entry.data_state == constants.K_OFFSET_NO_DATA:
             LOGGER.debug('K_OFFSET_NO_DATA')
             return
@@ -359,12 +361,15 @@ class Dump:
                 LOGGER.debug('K_OFFSET_POS_NOT_SET - %r, %r',
                              block_type, dump_id)
         else:
-            LOGGER.debug('K_OFFSET_POS_SET')
 
             self._handle.seek(entry.offset, io.SEEK_SET)
             block_type, dump_id = self._read_block_header()
+            LOGGER.debug('K_OFFSET_POS_SET %r %r %r',
+                         entry.offset, block_type, dump_id)
+
             if dump_id != entry.dump_id:
-                raise ValueError('Dump IDs do not match')
+                raise ValueError('Dump IDs do not match ({} != {}'.format(
+                    dump_id, entry.dump_id))
 
         if block_type == constants.BLK_DATA:
             for line in self._read_table_data():
@@ -465,12 +470,12 @@ class Dump:
         :rtype: datetime.datetime
 
         """
-        seconds, minutes, hour, day, month, year = (
+        second, minute, hour, day, month, year = (
             self._read_int(), self._read_int(), self._read_int(),
             self._read_int(), self._read_int() + 1, self._read_int() + 1900)
         self._read_int()  # DST flag
         return arrow.Arrow(
-            year, month, day, hour, minutes, seconds).to('local').datetime
+            year, month, day, hour, minute, second, 0, tz.tzlocal()).datetime
 
     def _save(self) -> None:
         """Save the dump file to disk"""
@@ -518,11 +523,15 @@ class Dump:
 
     def _write_data(self):
         """Write the data blocks"""
-        for entry in [e for e in self.entries
-                      if e.section == constants.SECTION_DATA]:
+        for offset, entry in enumerate(self.entries):
+            if entry.section != constants.SECTION_DATA:
+                continue
             LOGGER.debug('Processing %r', entry)
-            entry.data_state = constants.K_OFFSET_POS_SET
-            entry.offset = self._handle.tell()
+            self.entries[offset].data_state = constants.K_OFFSET_POS_SET
+
+            self.entries[offset].offset = self._handle.tell()
+            LOGGER.debug('New offset: %r', self.entries[offset].offset)
+
             path = pathlib.Path(self._temp_dir.name) / '{}.gz'.format(
                 entry.dump_id)
             LOGGER.debug('Reading %s.%s (%i) to %s',
@@ -532,10 +541,17 @@ class Dump:
                 if entry.desc == constants.TABLE_DATA:
                     self._handle.write(constants.BLK_DATA)
                     self._write_int(entry.dump_id)
+
+                    # Get the total size
                     handle.seek(0, io.SEEK_END)
-                    self._write_int(handle.tell())
+                    size = handle.tell()
+                    LOGGER.debug('Writing size: %r (%r)', size, handle)
+                    self._write_int(size)
+
+                    # Go back to start of file
                     handle.seek(0)
                     self._handle.write(handle.read())
+
                 elif entry.desc == constants.BLOBS:
                     self._handle.write(constants.BLK_BLOBS)
                     self._write_int(entry.dump_id)
@@ -555,7 +571,7 @@ class Dump:
                         'Unknown block type: {}'.format(entry.desc))
 
     def _write_entries(self) -> None:
-        """Write the post-data entries"""
+        """Write the toc entries"""
         self._write_int(len(self.entries))
         for entry in self.entries:
             self._write_entry(entry)
@@ -572,7 +588,7 @@ class Dump:
         self._write_str(entry.oid or '0')
         self._write_str(entry.tag)
         self._write_str(entry.desc)
-        self._write_int(constants.SECTIONS.index(entry.section))
+        self._write_int(constants.SECTIONS.index(entry.section) + 1)
         self._write_str(entry.defn)
         self._write_str(entry.drop_stmt)
         self._write_str(entry.copy_stmt)
@@ -583,7 +599,7 @@ class Dump:
         for dependency in entry.dependencies or []:
             self._write_str(str(dependency))
         self._write_int(-1)
-        self._write_offset(0, entry.data_state)
+        self._write_offset(entry.offset, entry.data_state)
 
     def _write_header(self) -> None:
         """Write the file header"""
@@ -637,6 +653,7 @@ class Dump:
         :param datetime.datetime value: The value to write
 
         """
+        LOGGER.debug('Writing timestamp: %r', value)
         self._write_int(value.second)
         self._write_int(value.minute)
         self._write_int(value.hour)

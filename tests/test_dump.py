@@ -10,6 +10,7 @@ from unittest import mock
 import uuid
 
 import arrow
+from dateutil import tz
 
 import pgdumplib
 from pgdumplib import constants, exceptions
@@ -79,7 +80,8 @@ class TestCase(unittest.TestCase):
             elif key == 'entry_count':
                 data[key] = int(match[0])
             elif key == 'timestamp':
-                data[key] = arrow.get(match[0]).to('local').datetime
+                data[key] = arrow.get(
+                    match[0]).replace(tzinfo=tz.tzlocal()).datetime
             else:
                 data[key] = match[0]
         return DumpInfo(**data)
@@ -104,7 +106,8 @@ class TestCase(unittest.TestCase):
             self.dump.server_version, self.info.server_version)
 
     def test_toc_timestamp(self):
-        self.assertEqual(self.dump.timestamp, self.info.timestamp)
+        self.assertEqual(
+            self.dump.timestamp.isoformat(), self.info.timestamp.isoformat())
 
     def test_read_dump_data(self):
         data = []
