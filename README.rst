@@ -52,7 +52,7 @@ iterate through the data of one of the tables.
    :target: https://github.com/gmr/pgdumplib/blob/master/LICENSE
    :alt: BSD
 
-.. |Docs| image:: https://img.shields.io//readthedocs/pgdumplib.svg?
+.. |Docs| image:: https://img.shields.io/readthedocs/pgdumplib.svg?
    :target: https://pgdumplib.readthedocs.io/
    :alt: Documentation Status
 
