@@ -18,6 +18,7 @@ Documentation
    :maxdepth: 2
 
    api
+   constants
    converters
    exceptions
    history
