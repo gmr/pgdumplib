@@ -214,6 +214,7 @@ class Dump:
         """
         if self._handle:
             self._handle.close()
+        self.compression = False
         self._handle = open(path, 'wb')
         self._save()
         self._handle.close()
@@ -473,13 +474,9 @@ class Dump:
 
     def _save(self) -> None:
         """Save the dump file to disk"""
-        self._write_header()
-        self._write_int(int(self.compression))
-        self._write_timestamp(self.timestamp)
-        self._write_str(self.dbname)
-        self._write_str(self.server_version)
-        self._write_str(self.dump_version)
-        self._write_entries()
+        self._write_toc()
+        self._write_data()
+        self._write_toc()
 
     def _set_encoding(self) -> None:
         """If the encoding is found in the dump entries, set the encoding
@@ -519,8 +516,46 @@ class Dump:
         """
         self._handle.write(struct.pack('B', value))
 
+    def _write_data(self):
+        """Write the data blocks"""
+        for entry in [e for e in self.entries
+                      if e.section == constants.SECTION_DATA]:
+            LOGGER.debug('Processing %r', entry)
+            entry.data_state = constants.K_OFFSET_POS_SET
+            entry.offset = self._handle.tell()
+            path = pathlib.Path(self._temp_dir.name) / '{}.gz'.format(
+                entry.dump_id)
+            LOGGER.debug('Reading %s.%s (%i) to %s',
+                         entry.namespace, entry.tag, entry.dump_id, path)
+            with gzip.open(path, 'rb') as handle:
+                LOGGER.debug('Reading %r', path)
+                if entry.desc == constants.TABLE_DATA:
+                    self._handle.write(constants.BLK_DATA)
+                    self._write_int(entry.dump_id)
+                    handle.seek(0, io.SEEK_END)
+                    self._write_int(handle.tell())
+                    handle.seek(0)
+                    self._handle.write(handle.read())
+                elif entry.desc == constants.BLOBS:
+                    self._handle.write(constants.BLK_BLOBS)
+                    self._write_int(entry.dump_id)
+                    while True:
+                        try:
+                            oid = struct.unpack('I', handle.read(4))[0]
+                        except struct.error:
+                            break
+                        length = struct.unpack('I', handle.read(4))[0]
+                        self._write_int(oid)
+                        self._write_int(length)
+                        self._handle.write(handle.read(length))
+                        self._write_int(0)
+                    self._write_int(0)
+                else:
+                    raise ValueError(
+                        'Unknown block type: {}'.format(entry.desc))
+
     def _write_entries(self) -> None:
-        """Write the entries"""
+        """Write the post-data entries"""
         self._write_int(len(self.entries))
         for entry in self.entries:
             self._write_entry(entry)
@@ -554,11 +589,11 @@ class Dump:
         """Write the file header"""
         self._handle.write(constants.MAGIC.encode('ASCII'))
         self._write_byte(self._vmaj)
-        self._write_byte(self._vmaj)
-        self._write_byte(self._vmaj)
+        self._write_byte(self._vmin)
+        self._write_byte(self._vrev)
         self._write_byte(self._intsize)
         self._write_byte(self._offsize)
-        self._write_byte(self._format)
+        self._write_byte(constants.FORMATS.index(self._format))
 
     def _write_int(self, value) -> None:
         """Write an integer value
@@ -609,3 +644,14 @@ class Dump:
         self._write_int(value.month - 1)
         self._write_int(value.year - 1900)
         self._write_int(1 if value.dst() else 0)
+
+    def _write_toc(self) -> None:
+        """Write the ToC for the file"""
+        self._handle.seek(0)
+        self._write_header()
+        self._write_int(int(self.compression))
+        self._write_timestamp(self.timestamp)
+        self._write_str(self.dbname)
+        self._write_str(self.server_version)
+        self._write_str(self.dump_version)
+        self._write_entries()
