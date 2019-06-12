@@ -192,8 +192,6 @@ class Dump:
         for entry in self._data_entries:
             path = pathlib.Path(self._temp_dir.name) / '{}.gz'.format(
                 entry.dump_id)
-            LOGGER.debug('Writing %s.%s (%i) to %s',
-                         entry.namespace, entry.tag, entry.dump_id, path)
             with gzip.open(path, 'wb') as handle:
                 if entry.desc == constants.BLOBS:
                     for oid, blob in self._read_entry_data(entry):
@@ -246,7 +244,6 @@ class Dump:
         """
         oid = self._read_int()
         while oid:
-            LOGGER.debug('Reading blob %s @ %i', oid, self._handle.tell())
             buffer = self._read_data()
             yield oid, buffer
             oid = self._read_int()
@@ -346,27 +343,19 @@ class Dump:
                      entry.dump_id, entry.namespace, entry.tag, entry.desc,
                      entry.offset)
         if entry.data_state == constants.K_OFFSET_NO_DATA:
-            LOGGER.debug('K_OFFSET_NO_DATA')
             return
 
         elif entry.data_state == constants.K_OFFSET_POS_NOT_SET:
             block_type, dump_id = self._read_block_header()
-            LOGGER.debug('K_OFFSET_POS_NOT_SET - %r, %r', block_type, dump_id)
             while block_type != constants.EOF and dump_id != entry.dump_id:
                 if block_type not in [constants.BLK_DATA, constants.BLK_BLOBS]:
                     raise ValueError(
                         'Unknown block type: {}'.format(block_type))
                 self._skip_data()
                 block_type, dump_id = self._read_block_header()
-                LOGGER.debug('K_OFFSET_POS_NOT_SET - %r, %r',
-                             block_type, dump_id)
         else:
-
             self._handle.seek(entry.offset, io.SEEK_SET)
             block_type, dump_id = self._read_block_header()
-            LOGGER.debug('K_OFFSET_POS_SET %r %r %r',
-                         entry.offset, block_type, dump_id)
-
             if dump_id != entry.dump_id:
                 raise ValueError('Dump IDs do not match ({} != {}'.format(
                     dump_id, entry.dump_id))
@@ -381,7 +370,6 @@ class Dump:
     def _read_entries(self) -> None:
         """Read in all of the entries"""
         entries = self._read_int()
-        LOGGER.debug('Reading %i entries', entries)
         [self._read_entry() for _i in range(0, entries)]
 
     def _read_entry(self) -> None:
@@ -412,7 +400,7 @@ class Dump:
         :raises: ValueError
 
         """
-        if self._handle.read(5).decode('ASCII') != constants.MAGIC:
+        if self._handle.read(5) != constants.MAGIC:
             raise ValueError('Invalid archive header')
 
         self._vmaj = struct.unpack('B', self._handle.read(1))[0]
@@ -491,7 +479,6 @@ class Dump:
             if entry.desc == 'ENCODING':
                 match = ENCODING_PATTERN.match(entry.defn)
                 self.encoding = match.group(1)
-                LOGGER.debug('Set encoding to %s', self.encoding)
                 return
 
     def _skip_data(self) -> None:
@@ -525,18 +512,11 @@ class Dump:
         for offset, entry in enumerate(self.entries):
             if entry.section != constants.SECTION_DATA:
                 continue
-            LOGGER.debug('Processing %r', entry)
             self.entries[offset].data_state = constants.K_OFFSET_POS_SET
-
             self.entries[offset].offset = self._handle.tell()
-            LOGGER.debug('New offset: %r', self.entries[offset].offset)
-
             path = pathlib.Path(self._temp_dir.name) / '{}.gz'.format(
                 entry.dump_id)
-            LOGGER.debug('Reading %s.%s (%i) to %s',
-                         entry.namespace, entry.tag, entry.dump_id, path)
             with gzip.open(path, 'rb') as handle:
-                LOGGER.debug('Reading %r', path)
                 if entry.desc == constants.TABLE_DATA:
                     self._handle.write(constants.BLK_DATA)
                     self._write_int(entry.dump_id)
@@ -544,7 +524,6 @@ class Dump:
                     # Get the total size
                     handle.seek(0, io.SEEK_END)
                     size = handle.tell()
-                    LOGGER.debug('Writing size: %r (%r)', size, handle)
                     self._write_int(size)
 
                     # Go back to start of file
@@ -603,7 +582,7 @@ class Dump:
 
     def _write_header(self) -> None:
         """Write the file header"""
-        self._handle.write(constants.MAGIC.encode('ASCII'))
+        self._handle.write(constants.MAGIC)
         self._write_byte(self._vmaj)
         self._write_byte(self._vmin)
         self._write_byte(self._vrev)
@@ -653,7 +632,6 @@ class Dump:
         :param datetime.datetime value: The value to write
 
         """
-        LOGGER.debug('Writing timestamp: %r', value)
         self._write_int(value.second)
         self._write_int(value.minute)
         self._write_int(value.hour)
