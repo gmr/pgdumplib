@@ -1,9 +1,29 @@
 """
-Class representing a pg_dump
+The :py:class:`~pgdumplib.dump.Dump` class exposes methods to
+:py:meth:`load <pgdumplib.dump.Dump.load>` an existing dump,
+to :py:meth:`add an entry <pgdumplib.dump.Dump.add_entry>` to a dump,
+to :py:meth:`add table data <pgdumplib.dump.Dump.add_data>` to a dump,
+to :py:meth:`add blob data <pgdumplib.dump.Dump.add_blob>` to a dump,
+and to :py:meth:`save <pgdumplib.dump.Dump.save>` a new dump.
+
+There are :doc:`converters` that are available to format the data that is
+returned by :py:meth:`~pgdumplib.dump.Dump.read_data`. The converter
+is passed in during construction of a new :py:class:`~pgdumplib.dump.Dump`,
+and is also available as an argument to :py:func:`pgdumplib.load`.
+
+The default converter, :py:class:`~pgdumplib.converters.DataConverter` will
+return all fields as strings, only replacing ``NULL`` with
+:py:const:`None`. The :py:class:`~pgdumplib.converters.SmartDataConverter`
+will attempt to convert all columns to native Python data types.
+
+When loading or creating a dump, the table and blob data are stored in
+gzip compressed data files in a temporary directory that is automatically
+cleaned up when the :py:class:`~pgdumplib.dump.Dump` instance is released.
 
 """
 from __future__ import annotations
 
+import dataclasses
 import datetime
 import gzip
 import io
@@ -18,7 +38,7 @@ import zlib
 import arrow
 from dateutil import tz
 
-from pgdumplib import constants, converters, exceptions, models, version
+from pgdumplib import constants, converters, exceptions, version
 
 LOGGER = logging.getLogger(__name__)
 
@@ -28,12 +48,20 @@ VERSION_INFO = '{} (pgdumplib {})'.format(constants.APPEAR_AS, version)
 
 
 class Dump:
-    """Dump Object containing data about the dump and includes methods for
-    reading data out of the dump.
+    """Create a new instance of the :py:class:`~pgdumplib.dump.Dump` class
+
+    Once created, the instance of :py:class:`~pgdumplib.dump.Dump` can
+    be used to read existing dumps or to create new ones.
+
+    :param str dbname: The database name for the dump (Default: ``pgdumplib``)
+    :param str encoding: The data encoding (Default: ``UTF8``)
+    :param converter: The data converter class to use
+        (Default: :py:class:`pgdumplib.converters.DataConverter`)
 
     """
-    def __init__(self, dbname='pgdumplib', encoding='UTF8',
-                 converter=converters.DataConverter):
+    def __init__(
+            self, dbname: str = 'pgdumplib', encoding: str = 'UTF8',
+            converter: typing.Optional[converters.DataConverter] = None):
         self.compression = False
         self.dbname = dbname
         self.dump_version = VERSION_INFO
@@ -41,6 +69,8 @@ class Dump:
         self.entries = []
         self.server_version = VERSION_INFO
         self.timestamp = arrow.now()
+
+        converter = converter or converters.DataConverter()
 
         self._converter = converter()
         self._format = constants.FORMAT_CUSTOM
@@ -52,34 +82,43 @@ class Dump:
         self._vmin: int = constants.MIN_VER[1]
         self._vrev: int = constants.MIN_VER[2]
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return '<Dump format={!r} timestamp={!r} entry_count={!r}>'.format(
             self._format, self.timestamp.isoformat(), len(self.entries))
 
-    def add_entry(self, namespace=None, tag=None,
-                  section=constants.SECTION_NONE, owner=None, desc=None,
-                  tablespace=None, defn=None, drop_stmt=None, copy_stmt=None,
-                  dependencies=None, dump_id=None) -> models.Entry:
+    def add_entry(
+            self, namespace: str, tag: str,
+            section: str = constants.SECTION_NONE,
+            owner: typing.Optional[str] = None,
+            desc: typing.Optional[str] = None,
+            tablespace: typing.Optional[str] = None,
+            defn: typing.Optional[str] = None,
+            drop_stmt: typing.Optional[str] = None,
+            copy_stmt: typing.Optional[str] = None,
+            dependencies: typing.Optional[typing.List[int]] = None,
+            dump_id: typing.Optional[int] = None) -> Entry:
         """Add an entry to the dump
 
-        The `namespace`, `tag`, and `section` are required.
+        The ``namespace`` and ``tag`` are required.
 
-        A :exc:`ValueError` will be raised if section is not one of
-        :const:`~pgdumplib.constants.SECTION_PRE_DATA`,
-        :const:`~pgdumplib.constants.SECTION_DATA`, or
-        :const:`~pgdumplib.constants.SECTION_POST_DATA`.
+        A :py:exc:`ValueError` will be raised if section is not one of
+        :py:const:`pgdumplib.constants.SECTION_PRE_DATA`,
+        :py:const:`pgdumplib.constants.SECTION_DATA`, or
+        :py:const:`pgdumplib.constants.SECTION_POST_DATA`.
 
-        When adding data, is is advised to invoke :meth:`~Dump.add_data`
-        instead of invoking :meth:`~Dump.add_entry` directly.
+        When adding data, is is advised to invoke :py:meth:`~Dump.add_data`
+        or :py:meth:`~Dump.add_blob` instead of invoking
+        :py:meth:`~Dump.add_entry` directly.
 
-        If `dependencies` are specified, they will be validated and if a
-        `dump_id` is specified and no entry is found with that `dump_id`,
-        a :exc:`ValueError` will be raised.
+        If ``dependencies`` are specified, they will be validated and if a
+        ``dump_id`` is specified and no entry is found with that ``dump_id``,
+        a :py:exc:`ValueError` will be raised.
 
         Other omitted values will be set to the default values will be set to
-        the defaults specified in the :class:`~pgdumplib.models.Entry` class.
+        the defaults specified in the :py:class:`pgdumplib.dump.Entry`
+        class.
 
-        The `dump_id` will be auto-calculated based upon the existing entries
+        The ``dump_id`` will be auto-calculated based upon the existing entries
         if it is not specified.
 
         :param str namespace: The namespace of the entry
@@ -95,8 +134,8 @@ class Dump:
         :param list dependencies: A list of dump_ids of objects that the entry
             is dependent upon.
         :param int dump_id: The dump id, will be auto-calculated if left empty
-        :raises: ValueError
-        :rtype: pgdumplib.models.Entry
+        :raises: :py:exc:`ValueError`
+        :rtype: pgdumplib.dump.Entry
 
         """
         if section not in constants.SECTIONS:
@@ -112,20 +151,22 @@ class Dump:
         if not dump_id:
             dump_id = max(dump_ids) + 1 if dump_ids else 1
 
-        self.entries.append(models.Entry(
+        self.entries.append(Entry(
             dump_id, False, None, None, tag, desc, section, defn, drop_stmt,
             copy_stmt, namespace, tablespace, owner, False, dependencies))
         return self.entries[-1]
 
-    def get_entry(self, namespace, tag, section=constants.SECTION_PRE_DATA) \
-            -> typing.Optional[models.Entry]:
+    def get_entry(self,
+                  namespace: str, tag: str,
+                  section: str = constants.SECTION_PRE_DATA) \
+            -> typing.Optional[Entry]:
         """Return the entry for the given namespace and tag
 
         :param str namespace: The namespace of the entry
         :param str tag: The tag/relation/table name
         :param str section: The dump section the entry is for
-        :raises: ValueError
-        :rtype: pgdumplib.models.Entry or None
+        :raises: :py:exc:`ValueError`
+        :rtype: pgdumplib.dump.Entry or None
 
         """
         if section not in constants.SECTIONS:
@@ -134,23 +175,24 @@ class Dump:
             if entry.namespace == namespace and entry.tag == tag:
                 return entry
 
-    def get_entry_by_dump_id(self, dump_id) -> typing.Optional[models.Entry]:
+    def get_entry_by_dump_id(self, dump_id: int) \
+            -> typing.Optional[Entry]:
         """Return the entry for the given `dump_id`
 
         :param int dump_id: The dump ID of the entry to return.
-        :rtype: pgdumplib.models.Entry or None
+        :rtype: pgdumplib.dump.Entry or None
 
         """
         for entry in self.entries:
             if entry.dump_id == dump_id:
                 return entry
 
-    def read_data(self, namespace, table) -> tuple:
+    def read_data(self, namespace: str, table: str) -> tuple:
         """Iterator that returns data for the given namespace and table
 
         :param str namespace: The namespace/schema for the table
         :param str table: The table name
-        :raises: :exc:`pgdumplib.exceptions.EntityNotFoundError`
+        :raises: :py:exc:`pgdumplib.exceptions.EntityNotFoundError`
 
         """
         for entry in self._data_entries:
@@ -160,11 +202,11 @@ class Dump:
                 return
         raise exceptions.EntityNotFoundError(namespace=namespace, table=table)
 
-    def load(self, path) -> Dump:
+    def load(self, path: str) -> Dump:
         """Load the Dumpfile, including extracting all data into a temporary
         directory
 
-        :raises: :exc:`ValueError`
+        :raises: :py:exc:`ValueError`
 
         """
         if not pathlib.Path(path).exists():
@@ -174,7 +216,7 @@ class Dump:
 
         self._read_header()
 
-        if self.version < constants.MIN_VER:
+        if constants.MIN_VER < self.version > constants.MAX_VER:
             raise ValueError(
                 'Unsupported backup version: {}.{}.{}'.format(
                     *self.version))
@@ -204,7 +246,7 @@ class Dump:
 
         return self
 
-    def save(self, path=None) -> None:
+    def save(self, path: str = None) -> None:
         """Save the Dump file to the specified path
 
         :param str path: The path to save the dump to
@@ -219,7 +261,7 @@ class Dump:
         self.load(path)
 
     @property
-    def version(self):
+    def version(self) -> typing.Tuple[int, int, int]:
         """Return the version as a tuple to make version comparisons easier.
 
         :rtype: tuple
@@ -228,7 +270,7 @@ class Dump:
         return self._vmaj, self._vmin, self._vrev
 
     @property
-    def _data_entries(self) -> list:
+    def _data_entries(self) -> typing.List[Entry]:
         """Return the list of entries that are in the data section
 
         :rtype: list
@@ -335,7 +377,7 @@ class Dump:
     def _read_entry_data(self, entry) -> typing.Optional[None, bytes, tuple]:
         """Read the data from the entry
 
-        :param pgdumplib.models.Entry entry: The entry to read
+        :param pgdumplib.dump.Entry entry: The entry to read
         :raises: :exc:`ValueError`
 
         """
@@ -392,7 +434,7 @@ class Dump:
             'dependencies': self._read_dependencies()
         }
         kwargs['data_state'], kwargs['offset'] = self._read_offset()
-        self.entries.append(models.Entry(**kwargs))
+        self.entries.append(Entry(**kwargs))
 
     def _read_header(self) -> None:
         """Read in the dump header
@@ -558,7 +600,7 @@ class Dump:
     def _write_entry(self, entry) -> None:
         """Write the entry
 
-        :param pgdumplib.models.Entry entry:
+        :param pgdumplib.dump.Entry entry:
 
         """
         self._write_int(entry.dump_id)
@@ -650,3 +692,53 @@ class Dump:
         self._write_str(self.server_version)
         self._write_str(self.dump_version)
         self._write_entries()
+
+
+@dataclasses.dataclass
+class Entry:
+    """The entry model represents a single entry in the dataclass
+
+    Custom formatted dump files are primarily comprised of entries, which
+    contain all of the metadata and DDL required to construct the database.
+
+    For table data and blobs, there are entries that contain offset locations
+    in the dump file that instruct the reader as to where the data lives
+    in the file.
+
+    :var int dump_id: The dump id, will be auto-calculated if left empty
+    :var bool had_dumper: Indicates
+    :var str oid: The OID of the object the entry represents
+    :var str tag: The name/table/relation/etc of the entry
+    :var str desc: The entry description
+    :var str section: The section for the entry
+    :var str defn: The DDL definition for the entry
+    :var str drop_stmt: A drop statement used to drop the entry before
+    :var str copy_stmt: A copy statement used when there is a corresponding
+        data section.
+    :var str namespace: The namespace of the entry
+    :var str tablespace: The tablespace to use
+    :var str owner: The owner of the object in Postgres
+    :var bool with_oids: Indicates ...
+    :var list dependencies: A list of dump_ids of objects that the entry
+        is dependent upon.
+    :var int data_state: Indicates if the entry has data and how it is stored
+    :var int offset: If the entry has data, the offset to the data in the file
+
+    """
+    dump_id: int
+    had_dumper: bool = False
+    table_oid: typing.Optional[str] = None
+    oid: typing.Optional[str] = None
+    tag: typing.Optional[str] = None
+    desc: typing.Optional[str] = None
+    section: str = constants.SECTIONS[0]
+    defn: typing.Optional[str] = None
+    drop_stmt: typing.Optional[str] = None
+    copy_stmt: typing.Optional[str] = None
+    namespace: typing.Optional[str] = None
+    tablespace: typing.Optional[str] = None
+    owner: typing.Optional[str] = None
+    with_oids: bool = False
+    dependencies: list = dataclasses.field(default_factory=list)
+    data_state: int = constants.K_OFFSET_NO_DATA
+    offset: int = 0

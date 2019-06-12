@@ -1,7 +1,7 @@
 pgdumplib
 =========
 
-Python3 library for reading and writing pg_dump files using the custom format.
+Python3 library for reading and writing `pg_dump`_ files using the custom format.
 
 |Version| |Status| |Coverage| |License|
 
@@ -12,29 +12,24 @@ Installation
 
     pip install pgdumplib
 
-Example Usage
+Documentation
 -------------
+.. toctree::
+   :maxdepth: 2
 
-The following example shows how to create a dump and then read it in, and
-iterate through the data of one of the tables.
+   api
+   converters
+   exceptions
+   history
 
-.. code::
+Indices and tables
+------------------
 
-    pg_dump -d pgbench -Fc -f pgbench.dump
+* :ref:`genindex`
+* :ref:`modindex`
+* :ref:`search`
 
-.. code::
-
-    import pgdumplib
-
-    dump = pgdumplib.load('pgbench.dump')
-
-    print('Database: {}'.format(dump.toc.dbname))
-    print('Archive Timestamp: {}'.format(dump.toc.timestamp))
-    print('Server Version: {}'.format(dump.toc.server_version))
-    print('Dump Version: {}'.format(dump.toc.dump_version))
-
-    for line in dump.read_data('public', 'pgbench_accounts'):
-        print(line)
+.. _pg_dump: https://www.postgresql.org/docs/current/app-pgdump.html
 
 .. |Version| image:: https://img.shields.io/pypi/v/pgdumplib.svg?
    :target: https://pypi.python.org/pypi/pgdumplib
@@ -47,6 +42,3 @@ iterate through the data of one of the tables.
 
 .. |License| image:: https://img.shields.io/pypi/l/pgdumplib.svg?
    :target: https://pgdumplib.readthedocs.org
-
-
-

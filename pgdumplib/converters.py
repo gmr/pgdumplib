@@ -1,9 +1,21 @@
 """
-Data Converters
+When creating a new :class:`pgdumplib.dump.Dump` instance, either directly
+or by using :py:func:`pgdumplib.load`, you can specify a converter class to
+use when reading data using the :meth:`pgdumplib.dump.Dump.read_data` iterator.
+
+The default converter (:py:class:`DataConverter`) will only replace columns
+that have a ``NULL`` indicator (``\\N``) with :py:const:`None`.
+
+The :py:class:`SmartDataConverter` will attempt to convert individual
+columns to native Python data types.
+
+Creating your own data converter is easy and should simply extend the
+:py:class:`DataConverter` class.
 
 """
 import decimal
 import ipaddress
+import typing
 import uuid
 
 import arrow
@@ -14,13 +26,13 @@ class DataConverter:
     """Base Row/Column Converter
 
     Base class used for converting row/column data when using the
-    :meth:`~pgdumplib.dump.Dump.read_data` iterator.
+    :meth:`pgdumplib.dump.Dump.read_data` iterator.
 
     This class just splits the row into individual columns and returns
-    the row as tuple of strings, only converting `\\N` to `None`.
+    the row as tuple of strings, only converting ``\\N`` to :py:const:`None`.
 
     """
-    def convert(self, row):
+    def convert(self, row: str) -> tuple:
         """Convert the string based row into a tuple of columns.
 
         :param str row: The row to convert
@@ -33,21 +45,24 @@ class DataConverter:
 class SmartDataConverter(DataConverter):
     """Attempts to convert columns to native Python data types
 
+    Used for converting row/column data with the
+    :meth:`pgdumplib.dump.Dump.read_data` iterator.
+
     Possible conversion types:
 
-    - int
-    - datetime.datetime
-    - decimal.Decimal
-    - ipaddress.IPv4Address
-    - ipaddress.IPv4Network
-    - ipaddress.IPv6Address
-    - ipaddress.IPv6Network
-    - None
-    - str
-    - uuid.UUID
+        - :py:class:`int`
+        - :py:class:`datetime.datetime`
+        - :py:class:`decimal.Decimal`
+        - :py:class:`ipaddress.IPv4Address`
+        - :py:class:`ipaddress.IPv4Network`
+        - :py:class:`ipaddress.IPv6Address`
+        - :py:class:`ipaddress.IPv6Network`
+        - :py:const:`None`
+        - :py:class:`str`
+        - :py:class:`uuid.UUID`
 
     """
-    def convert(self, row):
+    def convert(self, row: str) -> tuple:
         """Convert the string based row into a tuple of columns.
 
         :param str row: The row to convert
@@ -57,7 +72,7 @@ class SmartDataConverter(DataConverter):
         return tuple(self._convert_column(c) for c in row.split('\t'))
 
     @staticmethod
-    def _convert_column(column):
+    def _convert_column(column: str) -> typing.Any:
         """Attempt to convert the column from a string if appropriate
 
         :param str column: The column to attempt to convert
