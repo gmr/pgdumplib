@@ -155,7 +155,7 @@ class Dump:
         """
         for entry in self._data_entries:
             if entry.namespace == namespace and entry.tag == table:
-                for row in self._read_entry_data(entry):
+                for row in self._read_table_data(entry):
                     yield self._converter.convert(row)
                 return
         raise exceptions.EntityNotFoundError(namespace=namespace, table=table)
@@ -201,8 +201,8 @@ class Dump:
                         handle.write(struct.pack('I', len(blob)))
                         handle.write(blob)
                 else:
-                    for line in self._read_entry_data(entry):
-                        handle.write(line.encode(self.encoding) + b'\n')
+                    data = self._read_entry_data(entry)
+                    handle.write(data)
 
         return self
 
@@ -335,7 +335,7 @@ class Dump:
             values.add(int(value))
         return sorted(list(values))
 
-    def _read_entry_data(self, entry) -> str:
+    def _read_entry_data(self, entry) -> typing.Optional[None, bytes, tuple]:
         """Read the data from the entry
 
         :param pgdumplib.models.Entry entry: The entry to read
@@ -372,11 +372,9 @@ class Dump:
                     dump_id, entry.dump_id))
 
         if block_type == constants.BLK_DATA:
-            for line in self._read_table_data():
-                yield line
+            return self._read_data()
         elif block_type == constants.BLK_BLOBS:
-            for blob in self._read_blobs():
-                yield blob
+            return self._read_blobs()
         else:
             raise ValueError('Unknown block type: {}'.format(block_type))
 
@@ -453,13 +451,14 @@ class Dump:
             value |= bv << (offset * 8)
         return data_state, value
 
-    def _read_table_data(self) -> str:
+    def _read_table_data(self, entry) -> str:
         """Iterate through the data returning on row at a time
 
         :rtype: str
 
         """
-        for line in self._read_data().decode(self.encoding).split('\n'):
+        for line in self._read_entry_data(
+                entry).decode(self.encoding).split('\n'):
             if line.startswith('\\.'):
                 break
             yield line
@@ -550,7 +549,8 @@ class Dump:
 
                     # Go back to start of file
                     handle.seek(0)
-                    self._handle.write(handle.read())
+                    self._handle.write(handle.read(size))
+                    self._write_int(0)
 
                 elif entry.desc == constants.BLOBS:
                     self._handle.write(constants.BLK_BLOBS)
