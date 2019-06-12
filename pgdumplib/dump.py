@@ -91,11 +91,11 @@ class Dump:
             section: str = constants.SECTION_NONE,
             owner: typing.Optional[str] = None,
             desc: typing.Optional[str] = None,
-            tablespace: typing.Optional[str] = None,
             defn: typing.Optional[str] = None,
             drop_stmt: typing.Optional[str] = None,
             copy_stmt: typing.Optional[str] = None,
             dependencies: typing.Optional[typing.List[int]] = None,
+            tablespace: typing.Optional[str] = None,
             dump_id: typing.Optional[int] = None) -> Entry:
         """Add an entry to the dump
 
@@ -126,13 +126,13 @@ class Dump:
         :param str section: The section for the entry
         :param str owner: The owner of the object in Postgres
         :param str desc: The entry description
-        :param str tablespace: The tablespace to use
         :param str defn: The DDL definition for the entry
         :param drop_stmt: A drop statement used to drop the entry before
         :param copy_stmt: A copy statement used when there is a corresponding
             data section.
         :param list dependencies: A list of dump_ids of objects that the entry
             is dependent upon.
+        :param str tablespace: The tablespace to use
         :param int dump_id: The dump id, will be auto-calculated if left empty
         :raises: :py:exc:`ValueError`
         :rtype: pgdumplib.dump.Entry

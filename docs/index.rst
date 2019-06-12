@@ -21,6 +21,7 @@ Documentation
    constants
    converters
    exceptions
+   examples
    history
 
 Indices and tables
