@@ -57,3 +57,9 @@ class TestCase(unittest.TestCase):
             line = '\t'.join([convert(e) for e in expectation])
             row = list(converter.convert(line))
             self.assertListEqual(row, expectation)
+
+    def test_smart_data_converter_bad_date(self):
+        converter = converters.SmartDataConverter()
+        row = '2019-13-45 25:34:99 00:00\t1\tfoo\t\\N'
+        self.assertEqual(converter.convert(row),
+                         ('2019-13-45 25:34:99 00:00', 1, 'foo', None))

@@ -1,5 +1,6 @@
 """Test Reader"""
 import dataclasses
+import datetime
 import logging
 import pathlib
 import re
@@ -33,7 +34,7 @@ PATTERNS = {
 
 @dataclasses.dataclass
 class DumpInfo:
-    timestamp: str
+    timestamp: datetime.datetime
     dbname: str
     compression: str
     format: str
@@ -46,6 +47,105 @@ class DumpInfo:
 
 
 class TestCase(unittest.TestCase):
+
+    PATH = 'dump.not-compressed'
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.dump = pgdumplib.load(pathlib.Path('build') / 'data' / cls.PATH)
+
+    def test_read_dump_data(self):
+        data = []
+        for line in self.dump.read_data('public', 'pgbench_accounts'):
+            data.append(line)
+        self.assertEqual(len(data), 100000)
+
+    def test_read_dump_entity_not_found(self):
+        with self.assertRaises(exceptions.EntityNotFoundError):
+            for line in self.dump.read_data('public', 'foo'):
+                LOGGER.debug('Line: %r', line)
+
+    def test_get_entry(self):
+        entry = self.dump.get_entry('public', 'pgbench_accounts')
+        self.assertEqual(entry.namespace, 'public')
+        self.assertEqual(entry.tag, 'pgbench_accounts')
+        self.assertEqual(entry.section, constants.SECTION_PRE_DATA)
+
+    def test_get_entry_not_found(self):
+        self.assertIsNone(self.dump.get_entry('public', 'foo'))
+
+    def test_get_entry_invalid_section(self):
+        with self.assertRaises(ValueError):
+            self.dump.get_entry('public', 'pgbench_accounts', 'BAD SECTION')
+
+    def test_get_entry_by_dump_id(self):
+        entry = self.dump.get_entry('public', 'pgbench_accounts')
+        self.assertEqual(self.dump.get_entry_by_dump_id(entry.dump_id), entry)
+
+    def test_get_entry_by_dump_id_not_found(self):
+        dump_id = max(entry.dump_id for entry in self.dump.entries) + 100
+        self.assertIsNone(self.dump.get_entry_by_dump_id(dump_id))
+
+
+class CompressedTestCase(TestCase):
+
+    PATH = 'dump.compressed'
+
+
+class NoDataTestCase(TestCase):
+
+    HAS_DATA = False
+    PATH = 'dump.no-data'
+
+    def test_read_dump_data(self):
+        with self.assertRaises(exceptions.EntityNotFoundError):
+            for line in self.dump.read_data('public', 'pgbench_accounts'):
+                LOGGER.debug('Line: %r', line)
+
+
+class ErrorsTestCase(unittest.TestCase):
+
+    def test_missing_file_raises_value_error(self):
+        path = pathlib.Path(tempfile.gettempdir()) / str(uuid.uuid4())
+        with self.assertRaises(ValueError):
+            pgdumplib.load(path)
+
+    def test_min_version_failure_raises(self):
+        min_ver = (constants.MIN_VER[0],
+                   constants.MIN_VER[1] + 10,
+                   constants.MIN_VER[2])
+        LOGGER.debug('Setting pgdumplib.constants.MIN_VER to %s', min_ver)
+        with mock.patch('pgdumplib.constants.MIN_VER', min_ver):
+            with self.assertRaises(ValueError):
+                pgdumplib.load('build/data/dump.not-compressed')
+
+    def test_max_version_failure_raises(self):
+        max_ver = (0, constants.MAX_VER[1], constants.MAX_VER[2])
+        LOGGER.debug('Setting pgdumplib.constants.MAX_VER to %s', max_ver)
+        with mock.patch('pgdumplib.constants.MAX_VER', max_ver):
+            with self.assertRaises(ValueError):
+                pgdumplib.load('build/data/dump.not-compressed')
+
+    def test_invalid_dump_file(self):
+        with tempfile.NamedTemporaryFile('wb') as temp:
+            temp.write(b'PGBAD')
+            with open('build/data/dump.not-compressed', 'rb') as handle:
+                handle.read(5)
+                temp.write(handle.read())
+
+            with self.assertRaises(ValueError):
+                pgdumplib.load(temp.name)
+
+
+class NewDumpTestCase(unittest.TestCase):
+
+    def test_pgdumplib_new(self):
+        dmp = pgdumplib.new('test', 'UTF8', converters.SmartDataConverter)
+        self.assertIsInstance(dmp, dump.Dump)
+        self.assertIsInstance(dmp._converter, converters.SmartDataConverter)
+
+
+class RestoreComparisonTestCase(unittest.TestCase):
 
     PATH = 'dump.not-compressed'
 
@@ -109,76 +209,18 @@ class TestCase(unittest.TestCase):
         self.assertEqual(
             self.dump.timestamp.isoformat(), self.info.timestamp.isoformat())
 
-    def test_read_dump_data(self):
-        data = []
-        for line in self.dump.read_data('public', 'pgbench_accounts'):
-            data.append(line)
-        self.assertEqual(len(data), 100000)
 
-    def test_read_dump_entity_not_found(self):
-        with self.assertRaises(exceptions.EntityNotFoundError):
-            for line in self.dump.read_data('public', str(uuid.uuid4())):
-                LOGGER.debug('Line: %r', line)
-
-
-class CompressedTestCase(TestCase):
+class RestoreComparisonCompressedTestCase(RestoreComparisonTestCase):
 
     PATH = 'dump.compressed'
 
 
-class NoDataTestCase(TestCase):
+class RestoreComparisonNoDataTestCase(RestoreComparisonTestCase):
 
     HAS_DATA = False
     PATH = 'dump.no-data'
 
-    def test_read_dump_data(self):
-        with self.assertRaises(exceptions.EntityNotFoundError):
-            for line in self.dump.read_data('public', 'pgbench_accounts'):
-                LOGGER.debug('Line: %r', line)
 
-
-class DataOnlyTestCase(TestCase):
+class RestoreComparisonDataOnlyTestCase(RestoreComparisonTestCase):
 
     PATH = 'dump.data-only'
-
-
-class ErrorsTestCase(unittest.TestCase):
-
-    def test_missing_file_raises_value_error(self):
-        path = pathlib.Path(tempfile.gettempdir()) / str(uuid.uuid4())
-        with self.assertRaises(ValueError):
-            pgdumplib.load(path)
-
-    def test_min_version_failure_raises(self):
-        min_ver = (constants.MIN_VER[0],
-                   constants.MIN_VER[1] + 10,
-                   constants.MIN_VER[2])
-        LOGGER.debug('Setting pgdumplib.constants.MIN_VER to %s', min_ver)
-        with mock.patch('pgdumplib.constants.MIN_VER', min_ver):
-            with self.assertRaises(ValueError):
-                pgdumplib.load('build/data/dump.not-compressed')
-
-    def test_max_version_failure_raises(self):
-        max_ver = (0, constants.MAX_VER[1], constants.MAX_VER[2])
-        LOGGER.debug('Setting pgdumplib.constants.MAX_VER to %s', max_ver)
-        with mock.patch('pgdumplib.constants.MAX_VER', max_ver):
-            with self.assertRaises(ValueError):
-                pgdumplib.load('build/data/dump.not-compressed')
-
-    def test_invalid_dump_file(self):
-        with tempfile.NamedTemporaryFile('wb') as temp:
-            temp.write(b'PGBAD')
-            with open('build/data/dump.not-compressed', 'rb') as handle:
-                handle.read(5)
-                temp.write(handle.read())
-
-            with self.assertRaises(ValueError):
-                pgdumplib.load(temp.name)
-
-
-class NewDumpTestCase(unittest.TestCase):
-
-    def test_pgdumplib_new(self):
-        dmp = pgdumplib.new('test', 'UTF8', converters.SmartDataConverter)
-        self.assertIsInstance(dmp, dump.Dump)
-        self.assertIsInstance(dmp._converter, converters.SmartDataConverter)

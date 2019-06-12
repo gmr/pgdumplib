@@ -82,10 +82,7 @@ class SmartDataConverter(DataConverter):
         if column == '\\N':
             return None
         if column.strip('-').isnumeric():
-            try:
-                return int(column)
-            except ValueError:
-                pass
+            return int(column)
         elif column.strip('-').replace('.', '').isnumeric():
             try:
                 return decimal.Decimal(column)
@@ -105,6 +102,6 @@ class SmartDataConverter(DataConverter):
             pass
         try:
             return arrow.get(column).datetime
-        except parser.ParserError:
+        except (ValueError, parser.ParserError):
             pass
         return column
