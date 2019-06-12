@@ -13,7 +13,7 @@ import arrow
 from dateutil import tz
 
 import pgdumplib
-from pgdumplib import constants, exceptions
+from pgdumplib import constants, converters, dump, exceptions
 
 LOGGER = logging.getLogger(__name__)
 
@@ -174,3 +174,11 @@ class ErrorsTestCase(unittest.TestCase):
 
             with self.assertRaises(ValueError):
                 pgdumplib.load(temp.name)
+
+
+class NewDumpTestCase(unittest.TestCase):
+
+    def test_pgdumplib_new(self):
+        dmp = pgdumplib.new('test', 'UTF8', converters.SmartDataConverter)
+        self.assertIsInstance(dmp, dump.Dump)
+        self.assertIsInstance(dmp._converter, converters.SmartDataConverter)
