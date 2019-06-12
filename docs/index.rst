@@ -43,4 +43,4 @@ Indices and tables
    :target: https://codecov.io/github/gmr/pgdumplib?branch=master
 
 .. |License| image:: https://img.shields.io/pypi/l/pgdumplib.svg?
-   :target: https://pgdumplib.readthedocs.org
+   :target: https://github.com/gmr/pgdumplib/blob/master/LICENSE
