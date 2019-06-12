@@ -15,7 +15,7 @@ Once loaded, the table data in a dump is available to read using an iterator:
         print(row)
 
 """
-version = '0.3.0'
+version = '1.0.0'
 
 
 def load(filepath: str, converter=None):
@@ -29,7 +29,22 @@ def load(filepath: str, converter=None):
     :rtype: :py:class:`pgdumplib.dump.Dump`
 
     """
-    from pgdumplib import converters, dump
+    from pgdumplib import dump
 
-    return dump.Dump(
-        converter=converter or converters.DataConverter).load(filepath)
+    return dump.Dump(converter=converter).load(filepath)
+
+
+def new(dbname: str = 'pgdumplib', encoding: str = 'UTF8',
+        converter=None):
+    """Create a new :py:class:`pgdumplib.dump.Dump` instance
+
+    :param str dbname: The database name for the dump (Default: ``pgdumplib``)
+    :param str encoding: The data encoding (Default: ``UTF8``)
+    :param converter: The data converter class to use
+        (Default: :py:class:`pgdumplib.converters.DataConverter`)
+    :rtype: :py:class:`pgdumplib.dump.Dump`
+
+    """
+    from pgdumplib import dump
+
+    return dump.Dump(dbname, encoding, converter)
