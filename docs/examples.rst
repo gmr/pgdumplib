@@ -11,7 +11,8 @@ format:
 
     pg_dump -Fc -d [YOUR] dump.out
 
-Now create a python file to read in the data:
+The following example shows how to get the data and the table definition
+from a dump:
 
 .. code-block:: python
 
@@ -20,8 +21,7 @@ Now create a python file to read in the data:
     dump = pgdumplib.load('dump.out')
     for row in dump.read_data('public', 'table-name'):
         print(row)
-
-Additional examples exist on the :doc:`api` page.
+    print(dump.get_entry('public', 'table-name').defn)
 
 Writing
 -------
