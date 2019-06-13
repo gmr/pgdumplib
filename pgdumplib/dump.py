@@ -395,36 +395,27 @@ class Dump:
         """Read the data from the entry
 
         :param pgdumplib.dump.Entry entry: The entry to read
-        :raises: :exc:`ValueError`
+        :raises: :exc:`RuntimeError`
 
         """
         LOGGER.debug('Reading entry data for %i %s %s (%s) @ %i',
                      entry.dump_id, entry.namespace, entry.tag, entry.desc,
                      entry.offset)
         if entry.data_state == constants.K_OFFSET_NO_DATA:
-            return
-
-        elif entry.data_state == constants.K_OFFSET_POS_NOT_SET:
-            block_type, dump_id = self._read_block_header()
-            while block_type != constants.EOF and dump_id != entry.dump_id:
-                if block_type not in [constants.BLK_DATA, constants.BLK_BLOBS]:
-                    raise ValueError(
-                        'Unknown block type: {}'.format(block_type))
-                self._skip_data()
-                block_type, dump_id = self._read_block_header()
-        else:
-            self._handle.seek(entry.offset, io.SEEK_SET)
-            block_type, dump_id = self._read_block_header()
-            if dump_id != entry.dump_id:
-                raise ValueError('Dump IDs do not match ({} != {}'.format(
-                    dump_id, entry.dump_id))
-
+            return b''
+        elif entry.data_state != constants.K_OFFSET_POS_SET:
+            raise RuntimeError('Unsupported data format')
+        self._handle.seek(entry.offset, io.SEEK_SET)
+        block_type, dump_id = self._read_block_header()
+        if dump_id != entry.dump_id:
+            raise RuntimeError('Dump IDs do not match ({} != {}'.format(
+                dump_id, entry.dump_id))
         if block_type == constants.BLK_DATA:
             return self._read_data()
         elif block_type == constants.BLK_BLOBS:
             return self._read_blobs()
         else:
-            raise ValueError('Unknown block type: {}'.format(block_type))
+            raise RuntimeError('Unknown block type: {}'.format(block_type))
 
     def _read_entries(self) -> None:
         """Read in all of the entries"""
@@ -504,8 +495,10 @@ class Dump:
         :rtype: str
 
         """
-        data = self._read_entry_data(entry) or b''
-        for line in data.decode(self.encoding).split('\n'):
+        data = self._read_entry_data(entry).decode(self.encoding).split('\n')
+        if len(data) == 1 and not data[0]:
+            data = []
+        for line in data:
             if line.startswith('\\.') or not line:
                 break
             yield line
@@ -538,28 +531,8 @@ class Dump:
             if entry.desc == constants.ENCODING:
                 LOGGER.debug('Matched on encoding')
                 match = ENCODING_PATTERN.match(entry.defn)
-
                 self.encoding = match.group(1)
                 return
-        LOGGER.debug('Encoding not found')
-
-    def _skip_data(self) -> None:
-        """Skip data from current file position.
-        Data blocks are formatted as an integer length, followed by data.
-        A zero length denoted the end of the block.
-
-        """
-        block_length, buff_len = self._read_int(), 0
-        LOGGER.debug('Skipping %i', block_length)
-        while block_length:
-            if block_length > buff_len:
-                buff_len = block_length
-            data_in = self._handle.read(block_length)
-            if len(data_in) != block_length:
-                LOGGER.error('Failure to read full block (%i != %i)',
-                             len(data_in), block_length)
-                raise ValueError('Skip Read Failure')
-            block_length = self._read_int()
 
     def _write_byte(self, value) -> None:
         """Write a byte to the handle

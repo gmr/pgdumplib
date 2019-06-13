@@ -61,7 +61,7 @@ class EdgeTestCase(unittest.TestCase):
         with mock.patch('pgdumplib.constants.BLK_DATA', b'\x02'):
             dump.save('build/data/dump.test')
 
-        with self.assertRaises(ValueError):
+        with self.assertRaises(RuntimeError):
             pgdumplib.load('build/data/dump.test')
 
     def test_encoding_not_first_entry(self):
@@ -73,6 +73,14 @@ class EdgeTestCase(unittest.TestCase):
 
         dump = pgdumplib.load('build/data/dump.test')
         self.assertEqual(dump.encoding, 'LATIN1')
+
+    def test_encoding_no_entries(self):
+        dump = pgdumplib.new('test', 'LATIN1')
+        dump.entries = []
+        self.assertEqual(dump.encoding, 'LATIN1')
+        dump.save('build/data/dump.test')
+        dump = pgdumplib.load('build/data/dump.test')
+        self.assertEqual(dump.encoding, 'UTF8')
 
     def test_dump_id_mismatch_in_data(self):
         dump = pgdumplib.new('test')
@@ -86,18 +94,32 @@ class EdgeTestCase(unittest.TestCase):
 
         with mock.patch('pgdumplib.dump.Dump._read_block_header') as rbh:
             rbh.return_value = constants.BLK_DATA, 2048
-            with self.assertRaises(ValueError):
+            with self.assertRaises(RuntimeError):
                 pgdumplib.load('build/data/dump.test')
 
     def test_no_data(self):
         dump = pgdumplib.new('test')
         dump.add_entry(
             'bad', 'empty_table', constants.SECTION_DATA, None,
-            constants.TABLE_DATA, dump_id=1024)
-        with gzip.open(pathlib.Path(dump._temp_dir.name) / '1024.gz', 'wb'):
-            pass
+            constants.TABLE_DATA, dump_id=5)
+        with gzip.open(pathlib.Path(dump._temp_dir.name) / '5.gz', 'wb') as h:
+            h.write(b'')
         dump.save('build/data/dump.test')
 
         dump = pgdumplib.load('build/data/dump.test')
         data = [line for line in dump.read_data('bad', 'empty_table')]
         self.assertListEqual(data, [])
+
+    def test_runtime_error_when_pos_not_set(self):
+        dump = pgdumplib.new('test')
+        dump.add_entry('public', 'table', constants.SECTION_DATA, None,
+                       constants.TABLE_DATA, dump_id=32)
+        with gzip.open(pathlib.Path(dump._temp_dir.name) / '32.gz', 'wb') as h:
+            h.write(b'1\t\1\t\1\n')
+
+        dump.save('build/data/dump.test')
+        with mock.patch('pgdumplib.constants.K_OFFSET_POS_SET', 9):
+            dump.save('build/data/dump.test')
+
+        with self.assertRaises(RuntimeError):
+            pgdumplib.load('build/data/dump.test')
