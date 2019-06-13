@@ -72,7 +72,7 @@ class Dump:
 
         converter = converter or converters.DataConverter
         self._converter = converter()
-        self._format = constants.FORMAT_CUSTOM
+        self._format = 'Custom'
         self._handle = None
         self._intsize: int = 4
         self._offsize: int = 8
