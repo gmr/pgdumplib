@@ -66,7 +66,18 @@ class Dump:
         self.dbname = dbname
         self.dump_version = VERSION_INFO
         self.encoding = encoding
-        self.entries = []
+        self.entries = [
+            Entry(
+                dump_id=1, tag='ENCODING', section=constants.SECTION_PRE_DATA,
+                defn="SET client_encoding = '{}';".format(self.encoding)),
+            Entry(
+                dump_id=2, tag='STDSTRINGS',
+                section=constants.SECTION_PRE_DATA,
+                defn="SET standard_conforming_strings = 'on';"),
+            Entry(
+                dump_id=3, tag='ENCODING', section=constants.SECTION_PRE_DATA,
+                defn="SELECT pg_catalog.set_config('search_path', '', false);")
+        ]
         self.server_version = VERSION_INFO
         self.timestamp = arrow.now()
 
@@ -86,7 +97,9 @@ class Dump:
             self._format, self.timestamp.isoformat(), len(self.entries))
 
     def add_entry(
-            self, namespace: str, tag: str,
+            self,
+            namespace: typing.Optional[str],
+            tag: str,
             section: str = constants.SECTION_NONE,
             owner: typing.Optional[str] = None,
             desc: typing.Optional[str] = None,
@@ -148,11 +161,14 @@ class Dump:
                     'Dependency dump_id {!r} not found'.format(dependency))
 
         if not dump_id:
-            dump_id = max(dump_ids) + 1 if dump_ids else 1
+            dump_id = max(dump_ids) + 1
 
         self.entries.append(Entry(
             dump_id, False, None, None, tag, desc, section, defn, drop_stmt,
             copy_stmt, namespace, tablespace, owner, False, dependencies))
+
+        LOGGER.debug('Appended entry #%i: %r',
+                     len(self.entries), self.entries[-1])
         return self.entries[-1]
 
     def get_entry(self,
@@ -210,6 +226,8 @@ class Dump:
         """
         if not pathlib.Path(path).exists():
             raise ValueError('Path {!r} does not exist'.format(path))
+
+        self.entries = []  # Wipe out pre-existing entries
 
         self._handle = open(path, 'rb')
 
@@ -488,7 +506,7 @@ class Dump:
         """
         for line in self._read_entry_data(
                 entry).decode(self.encoding).split('\n'):
-            if line.startswith('\\.'):
+            if line.startswith('\\.') or not line:
                 break
             yield line
 
@@ -592,6 +610,7 @@ class Dump:
 
     def _write_entries(self) -> None:
         """Write the toc entries"""
+        LOGGER.debug('Writing %i entries', len(self.entries))
         self._write_int(len(self.entries))
         for entry in self.entries:
             self._write_entry(entry)
@@ -602,6 +621,8 @@ class Dump:
         :param pgdumplib.dump.Entry entry:
 
         """
+        LOGGER.debug('Writing %i %s %s %s',
+                     entry.dump_id, entry.desc, entry.namespace, entry.tag)
         self._write_int(entry.dump_id)
         self._write_int(int(entry.had_dumper))
         self._write_str(entry.table_oid or '0')
