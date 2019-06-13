@@ -32,7 +32,8 @@ class DataConverter:
     the row as tuple of strings, only converting ``\\N`` to :py:const:`None`.
 
     """
-    def convert(self, row: str) -> tuple:
+    @staticmethod
+    def convert(row: str) -> tuple:
         """Convert the string based row into a tuple of columns.
 
         :param str row: The row to convert
@@ -40,6 +41,19 @@ class DataConverter:
 
         """
         return tuple(None if e == '\\N' else e for e in row.split('\t'))
+
+
+class NoOpConverter:
+    """Performs no conversion on the row passed in"""
+    @staticmethod
+    def convert(row: str) -> str:
+        """Returns the row passed in
+
+        :param str row: The row to convert
+        :rtype: str
+
+        """
+        return row
 
 
 class SmartDataConverter(DataConverter):

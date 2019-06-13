@@ -28,6 +28,11 @@ class TestCase(unittest.TestCase):
             line = '\t'.join(['\\N' if e is None else e for e in expectation])
             self.assertListEqual(list(converter.convert(line)), expectation)
 
+    def test_noop_converter(self):
+        converter = converters.NoOpConverter()
+        value = '1\t\\N\tfoo\t     \t'
+        self.assertEqual(converter.convert(value), value)
+
     def test_smart_data_converter(self):
         fake = faker.Faker()
         data = []
