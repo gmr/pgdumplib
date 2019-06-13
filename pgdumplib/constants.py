@@ -11,6 +11,7 @@ BLK_DATA = b'\x01'
 BLK_BLOBS = b'\x03'
 
 BLOBS = 'BLOBS'
+ENCODING = 'ENCODING'
 
 EOF = -1
 

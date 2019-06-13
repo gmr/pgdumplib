@@ -42,7 +42,7 @@ from pgdumplib import constants, converters, exceptions, version
 
 LOGGER = logging.getLogger(__name__)
 
-ENCODING_PATTERN = re.compile(r"^SET\s+client_encoding\s+=\s+'(.*)';")
+ENCODING_PATTERN = re.compile(r"^.*=\s+'(.*)'")
 
 VERSION_INFO = '{} (pgdumplib {})'.format(constants.APPEAR_AS, version)
 
@@ -68,14 +68,16 @@ class Dump:
         self.encoding = encoding
         self.entries = [
             Entry(
-                dump_id=1, tag='ENCODING', section=constants.SECTION_PRE_DATA,
+                dump_id=1, tag=constants.ENCODING, desc=constants.ENCODING,
+                section=constants.SECTION_PRE_DATA,
                 defn="SET client_encoding = '{}';".format(self.encoding)),
             Entry(
-                dump_id=2, tag='STDSTRINGS',
+                dump_id=2, tag='STDSTRINGS', desc='STDSTRINGS',
                 section=constants.SECTION_PRE_DATA,
                 defn="SET standard_conforming_strings = 'on';"),
             Entry(
-                dump_id=3, tag='ENCODING', section=constants.SECTION_PRE_DATA,
+                dump_id=3, tag='SEARCHPATH', desc='SEARCHPATH',
+                section=constants.SECTION_PRE_DATA,
                 defn="SELECT pg_catalog.set_config('search_path', '', false);")
         ]
         self.server_version = VERSION_INFO
@@ -228,11 +230,8 @@ class Dump:
             raise ValueError('Path {!r} does not exist'.format(path))
 
         self.entries = []  # Wipe out pre-existing entries
-
         self._handle = open(path, 'rb')
-
         self._read_header()
-
         if not constants.MIN_VER <= self.version <= constants.MAX_VER:
             raise ValueError(
                 'Unsupported backup version: {}.{}.{}'.format(
@@ -259,7 +258,8 @@ class Dump:
                         handle.write(blob)
                 else:
                     data = self._read_entry_data(entry)
-                    handle.write(data)
+                    if data:
+                        handle.write(data)
 
         return self
 
@@ -504,8 +504,8 @@ class Dump:
         :rtype: str
 
         """
-        for line in self._read_entry_data(
-                entry).decode(self.encoding).split('\n'):
+        data = self._read_entry_data(entry) or b''
+        for line in data.decode(self.encoding).split('\n'):
             if line.startswith('\\.') or not line:
                 break
             yield line
@@ -535,10 +535,13 @@ class Dump:
 
         """
         for entry in self.entries:
-            if entry.desc == 'ENCODING':
+            if entry.desc == constants.ENCODING:
+                LOGGER.debug('Matched on encoding')
                 match = ENCODING_PATTERN.match(entry.defn)
+
                 self.encoding = match.group(1)
                 return
+        LOGGER.debug('Encoding not found')
 
     def _skip_data(self) -> None:
         """Skip data from current file position.
@@ -571,8 +574,10 @@ class Dump:
         for offset, entry in enumerate(self.entries):
             if entry.section != constants.SECTION_DATA:
                 continue
+
             self.entries[offset].data_state = constants.K_OFFSET_POS_SET
             self.entries[offset].offset = self._handle.tell()
+
             path = pathlib.Path(self._temp_dir.name) / '{}.gz'.format(
                 entry.dump_id)
             with gzip.open(path, 'rb') as handle:
@@ -583,11 +588,15 @@ class Dump:
                     # Get the total size
                     handle.seek(0, io.SEEK_END)
                     size = handle.tell()
+                    if not size:
+                        self.entries[offset].data_state = \
+                            constants.K_OFFSET_NO_DATA
                     self._write_int(size)
 
                     # Go back to start of file
                     handle.seek(0)
-                    self._handle.write(handle.read(size))
+                    if size:
+                        self._handle.write(handle.read(size))
                     self._write_int(0)
 
                 elif entry.desc == constants.BLOBS:
@@ -621,8 +630,9 @@ class Dump:
         :param pgdumplib.dump.Entry entry:
 
         """
-        LOGGER.debug('Writing %i %s %s %s',
-                     entry.dump_id, entry.desc, entry.namespace, entry.tag)
+        LOGGER.debug(
+            'Writing %i %s %s %s %r',
+            entry.dump_id, entry.desc, entry.namespace, entry.tag, entry.defn)
         self._write_int(entry.dump_id)
         self._write_int(int(entry.had_dumper))
         self._write_str(entry.table_oid or '0')
