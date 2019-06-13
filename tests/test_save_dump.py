@@ -1,4 +1,5 @@
 import dataclasses
+import pathlib
 import unittest
 
 import pgdumplib
@@ -13,6 +14,12 @@ class SavedDumpTestCase(unittest.TestCase):
         dump.save('build/data/dump.test')
         cls.original = pgdumplib.load('build/data/dump.compressed')
         cls.saved = pgdumplib.load('build/data/dump.test')
+
+    @classmethod
+    def tearDownClass(cls) -> None:
+        test_file = pathlib.Path('build/data/dump.test')
+        if test_file.exists():
+            test_file.unlink()
 
     def test_timestamp_matches(self):
         self.assertEqual(self.original.timestamp.isoformat(),
@@ -57,3 +64,58 @@ class SavedDumpTestCase(unittest.TestCase):
                         self.original.entries[entry].namespace,
                         self.original.entries[entry].tag,
                         offset))
+
+
+class EmptyDumpTestCase(unittest.TestCase):
+
+    def test_empty_dump_has_base_entries(self):
+        dump = pgdumplib.new('test', 'UTF8')
+        self.assertEqual(len(dump.entries), 3)
+
+    def test_empty_save_does_not_err(self):
+        dump = pgdumplib.new('test', 'UTF8')
+        dump.save('build/data/dump.test')
+        test_file = pathlib.Path('build/data/dump.test')
+        self.assertTrue(test_file.exists())
+        test_file.unlink()
+
+
+class CreateDumpTestCase(unittest.TestCase):
+
+    def tearClass(self) -> None:
+        test_file = pathlib.Path('build/data/dump.test')
+        if test_file.exists():
+            test_file.unlink()
+
+    def test_dump_exepctations(self):
+        dump = pgdumplib.new('test', 'UTF8')
+        entry = dump.add_entry(
+            None, 'postgres', constants.SECTION_PRE_DATA, 'postgres',
+            'DATABASE',
+            """\
+            CREATE DATABASE postgres
+              WITH TEMPLATE = template0
+                   ENCODING = 'UTF8'
+                   LC_COLLATE = 'en_US.utf8'
+                   LC_CTYPE = 'en_US.utf8';""",
+            'DROP DATABASE postgres',
+            dump_id=1024)
+
+        dump.add_entry(
+            None, 'DATABASE postgres', constants.SECTION_PRE_DATA,
+            'postgres', 'COMMENT',
+            """\
+            COMMENT ON DATABASE postgres
+                 IS 'default administrative connection database';""",
+            dependencies=[entry.dump_id])
+
+        dump.save('build/data/dump.test')
+
+        test_file = pathlib.Path('build/data/dump.test')
+        self.assertTrue(test_file.exists())
+
+        dump = dump.load(test_file)
+        entry = dump.get_entry_by_dump_id(1024)
+        self.assertEqual(entry.desc, 'DATABASE')
+        self.assertEqual(entry.owner, 'postgres')
+        self.assertEqual(entry.tag, 'postgres')

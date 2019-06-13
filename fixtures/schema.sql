@@ -8,6 +8,13 @@ GRANT USAGE ON SCHEMA test TO PUBLIC;
 
 SET search_path = test, public, pg_catalog;
 
+CREATE TABLE empty_table(
+    id               UUID                     NOT NULL DEFAULT uuid_generate_v4() PRIMARY KEY,
+    created_at       TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    last_modified_at TIMESTAMP WITH TIME ZONE,
+    column_name      TEXT
+);
+
 CREATE DOMAIN test.email_address AS citext
         CHECK ( value ~ '^[a-zA-Z0-9.!#$%&''*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$' );
 

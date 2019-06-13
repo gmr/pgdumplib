@@ -49,16 +49,24 @@ class DumpInfo:
 class TestCase(unittest.TestCase):
 
     PATH = 'dump.not-compressed'
+    CONVERTER = converters.DataConverter
 
     @classmethod
     def setUpClass(cls) -> None:
-        cls.dump = pgdumplib.load(pathlib.Path('build') / 'data' / cls.PATH)
+        cls.dump = pgdumplib.load(
+            pathlib.Path('build') / 'data' / cls.PATH, cls.CONVERTER)
 
-    def test_read_dump_data(self):
+    def test_read_data(self):
         data = []
         for line in self.dump.read_data('public', 'pgbench_accounts'):
             data.append(line)
         self.assertEqual(len(data), 100000)
+
+    def test_read_data_empty(self):
+        data = []
+        for line in self.dump.read_data('test', 'empty_table'):
+            data.append(line)
+        self.assertEqual(len(data), 0)
 
     def test_read_dump_entity_not_found(self):
         with self.assertRaises(exceptions.EntityNotFoundError):
@@ -92,15 +100,33 @@ class CompressedTestCase(TestCase):
     PATH = 'dump.compressed'
 
 
+class InsertsTestCase(TestCase):
+
+    CONVERTER = converters.NoOpConverter
+    PATH = 'dump.inserts'
+
+    def test_read_dump_data(self):
+        count = 0
+        for line in self.dump.read_data('public', 'pgbench_accounts'):
+            self.assertTrue(
+                line.startswith('INSERT INTO public.pgbench_accounts'),
+                'Unexpected start @ row {}: {!r}'.format(count, line))
+            count += 1
+        self.assertEqual(count, 100000)
+
+
 class NoDataTestCase(TestCase):
 
     HAS_DATA = False
     PATH = 'dump.no-data'
 
-    def test_read_dump_data(self):
+    def test_read_data(self):
         with self.assertRaises(exceptions.EntityNotFoundError):
-            for line in self.dump.read_data('public', 'pgbench_accounts'):
-                LOGGER.debug('Line: %r', line)
+            super().test_read_data()
+
+    def test_read_data_empty(self):
+        with self.assertRaises(exceptions.EntityNotFoundError):
+            super().test_read_data_empty()
 
 
 class ErrorsTestCase(unittest.TestCase):

@@ -12,6 +12,9 @@ class EntityNotFoundError(PgDumpLibException):
     """Raised when an attempt is made to read data from a relation in a
     dump file but it is not found in the table of contents.
 
+    This can happen if a schema-only dump was created OR if the ``namespace``
+    and ``table`` specified were not found.
+
     """
     def __init__(self, namespace, table, *args):
         super().__init__(args)

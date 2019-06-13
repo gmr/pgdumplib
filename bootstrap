@@ -84,6 +84,7 @@ docker-compose exec postgres /usr/bin/pg_dump -Fc -U postgres -f /data/dump.not-
 docker-compose exec postgres /usr/bin/pg_dump -Fc -U postgres -f /data/dump.compressed -d postgres --compress=9
 docker-compose exec postgres /usr/bin/pg_dump -Fc -U postgres -f /data/dump.no-data -d postgres --compress=0 -s
 docker-compose exec postgres /usr/bin/pg_dump -Fc -U postgres -f /data/dump.data-only -d postgres --compress=0 -a
+docker-compose exec postgres /usr/bin/pg_dump -Fc -U postgres -f /data/dump.inserts -d postgres --compress=0 --inserts
 report_done
 
 printf "Fixing permissions ... "
