@@ -56,21 +56,21 @@ class TestCase(unittest.TestCase):
         cls.dump = pgdumplib.load(
             pathlib.Path('build') / 'data' / cls.PATH, cls.CONVERTER)
 
-    def test_read_data(self):
+    def test_read_table_data(self):
         data = []
-        for line in self.dump.read_data('public', 'pgbench_accounts'):
+        for line in self.dump.read_table_data('public', 'pgbench_accounts'):
             data.append(line)
         self.assertEqual(len(data), 100000)
 
-    def test_read_data_empty(self):
+    def test_read_table_data_empty(self):
         data = []
-        for line in self.dump.read_data('test', 'empty_table'):
+        for line in self.dump.read_table_data('test', 'empty_table'):
             data.append(line)
         self.assertEqual(len(data), 0)
 
     def test_read_dump_entity_not_found(self):
         with self.assertRaises(exceptions.EntityNotFoundError):
-            for line in self.dump.read_data('public', 'foo'):
+            for line in self.dump.read_table_data('public', 'foo'):
                 LOGGER.debug('Line: %r', line)
 
     def test_get_entry(self):
@@ -107,7 +107,7 @@ class InsertsTestCase(TestCase):
 
     def test_read_dump_data(self):
         count = 0
-        for line in self.dump.read_data('public', 'pgbench_accounts'):
+        for line in self.dump.read_table_data('public', 'pgbench_accounts'):
             self.assertTrue(
                 line.startswith('INSERT INTO public.pgbench_accounts'),
                 'Unexpected start @ row {}: {!r}'.format(count, line))
@@ -120,13 +120,13 @@ class NoDataTestCase(TestCase):
     HAS_DATA = False
     PATH = 'dump.no-data'
 
-    def test_read_data(self):
+    def test_read_table_data(self):
         with self.assertRaises(exceptions.EntityNotFoundError):
-            super().test_read_data()
+            super().test_read_table_data()
 
-    def test_read_data_empty(self):
+    def test_read_table_data_empty(self):
         with self.assertRaises(exceptions.EntityNotFoundError):
-            super().test_read_data_empty()
+            super().test_read_table_data_empty()
 
 
 class ErrorsTestCase(unittest.TestCase):

@@ -1,11 +1,12 @@
 import gzip
 import pathlib
 import struct
+import tempfile
 import unittest
 from unittest import mock
 
 import pgdumplib
-from pgdumplib import constants
+from pgdumplib import constants, dump
 
 
 class EdgeTestCase(unittest.TestCase):
@@ -29,68 +30,68 @@ class EdgeTestCase(unittest.TestCase):
             test_file.unlink()
 
     def test_invalid_data_type(self):
-        dump = pgdumplib.new('test')
-        dump.add_entry(
+        dmp = pgdumplib.new('test')
+        dmp.add_entry(
             'bad', 'entry_desc', constants.SECTION_DATA, None, 'INVALID')
         with gzip.open(
-                pathlib.Path(dump._temp_dir.name) / '4.gz', 'wb') as handle:
+                pathlib.Path(dmp._temp_dir.name) / '4.gz', 'wb') as handle:
             handle.write(b'BADDATASHOULDBLOWUPHARD')
 
         with self.assertRaises(ValueError):
-            dump.save('build/data/dump.test')
+            dmp.save('build/data/dump.test')
 
     def test_invalid_section(self):
-        dump = pgdumplib.new('test')
+        dmp = pgdumplib.new('test')
         with self.assertRaises(ValueError):
-            dump.add_entry('bad', 'block_table', 'INVALID')
+            dmp.add_entry('bad', 'block_table', 'INVALID')
 
     def test_invalid_dependency(self):
-        dump = pgdumplib.new('test')
+        dmp = pgdumplib.new('test')
         with self.assertRaises(ValueError):
-            dump.add_entry('bad', 'block_table', dependencies=[1024])
+            dmp.add_entry('bad', 'block_table', dependencies=[1024])
 
     def test_invalid_block_type_in_data(self):
-        dump = pgdumplib.new('test')
-        dump.add_entry(
+        dmp = pgdumplib.new('test')
+        dmp.add_entry(
             'bad', 'block_table', constants.SECTION_DATA, None,
             constants.TABLE_DATA, dump_id=1024)
         with gzip.open(
-                pathlib.Path(dump._temp_dir.name) / '1024.gz', 'wb') as handle:
+                pathlib.Path(dmp._temp_dir.name) / '1024.gz', 'wb') as handle:
             handle.write(b'1\t\1\t\1\n')
 
         with mock.patch('pgdumplib.constants.BLK_DATA', b'\x02'):
-            dump.save('build/data/dump.test')
+            dmp.save('build/data/dump.test')
 
         with self.assertRaises(RuntimeError):
             pgdumplib.load('build/data/dump.test')
 
     def test_encoding_not_first_entry(self):
-        dump = pgdumplib.new('test', 'LATIN1')
-        entries = dump.entries
-        dump.entries = [entries[1], entries[2], entries[0]]
-        self.assertEqual(dump.encoding, 'LATIN1')
-        dump.save('build/data/dump.test')
+        dmp = pgdumplib.new('test', 'LATIN1')
+        entries = dmp.entries
+        dmp.entries = [entries[1], entries[2], entries[0]]
+        self.assertEqual(dmp.encoding, 'LATIN1')
+        dmp.save('build/data/dump.test')
 
-        dump = pgdumplib.load('build/data/dump.test')
-        self.assertEqual(dump.encoding, 'LATIN1')
+        dmp = pgdumplib.load('build/data/dump.test')
+        self.assertEqual(dmp.encoding, 'LATIN1')
 
     def test_encoding_no_entries(self):
-        dump = pgdumplib.new('test', 'LATIN1')
-        dump.entries = []
-        self.assertEqual(dump.encoding, 'LATIN1')
-        dump.save('build/data/dump.test')
-        dump = pgdumplib.load('build/data/dump.test')
-        self.assertEqual(dump.encoding, 'UTF8')
+        dmp = pgdumplib.new('test', 'LATIN1')
+        dmp.entries = []
+        self.assertEqual(dmp.encoding, 'LATIN1')
+        dmp.save('build/data/dump.test')
+        dmp = pgdumplib.load('build/data/dump.test')
+        self.assertEqual(dmp.encoding, 'UTF8')
 
     def test_dump_id_mismatch_in_data(self):
-        dump = pgdumplib.new('test')
-        dump.add_entry(
+        dmp = pgdumplib.new('test')
+        dmp.add_entry(
             'bad', 'block_table', constants.SECTION_DATA, None,
             constants.TABLE_DATA, dump_id=1024)
         with gzip.open(
-                pathlib.Path(dump._temp_dir.name) / '1024.gz', 'wb') as handle:
+                pathlib.Path(dmp._temp_dir.name) / '1024.gz', 'wb') as handle:
             handle.write(b'1\t\1\t\1\n')
-        dump.save('build/data/dump.test')
+        dmp.save('build/data/dump.test')
 
         with mock.patch('pgdumplib.dump.Dump._read_block_header') as rbh:
             rbh.return_value = constants.BLK_DATA, 2048
@@ -98,28 +99,36 @@ class EdgeTestCase(unittest.TestCase):
                 pgdumplib.load('build/data/dump.test')
 
     def test_no_data(self):
-        dump = pgdumplib.new('test')
-        dump.add_entry(
+        dmp = pgdumplib.new('test')
+        dmp.add_entry(
             'bad', 'empty_table', constants.SECTION_DATA, None,
             constants.TABLE_DATA, dump_id=5)
-        with gzip.open(pathlib.Path(dump._temp_dir.name) / '5.gz', 'wb') as h:
+        with gzip.open(pathlib.Path(dmp._temp_dir.name) / '5.gz', 'wb') as h:
             h.write(b'')
-        dump.save('build/data/dump.test')
+        dmp.save('build/data/dump.test')
 
-        dump = pgdumplib.load('build/data/dump.test')
-        data = [line for line in dump.read_data('bad', 'empty_table')]
+        dmp = pgdumplib.load('build/data/dump.test')
+        data = [line for line in dmp.read_table_data('bad', 'empty_table')]
         self.assertListEqual(data, [])
 
     def test_runtime_error_when_pos_not_set(self):
-        dump = pgdumplib.new('test')
-        dump.add_entry('public', 'table', constants.SECTION_DATA, None,
-                       constants.TABLE_DATA, dump_id=32)
-        with gzip.open(pathlib.Path(dump._temp_dir.name) / '32.gz', 'wb') as h:
+        dmp = pgdumplib.new('test')
+        dmp.add_entry('public', 'table', constants.SECTION_DATA, None,
+                      constants.TABLE_DATA, dump_id=32)
+        with gzip.open(pathlib.Path(dmp._temp_dir.name) / '32.gz', 'wb') as h:
             h.write(b'1\t\1\t\1\n')
 
-        dump.save('build/data/dump.test')
+        dmp.save('build/data/dump.test')
         with mock.patch('pgdumplib.constants.K_OFFSET_POS_SET', 9):
-            dump.save('build/data/dump.test')
+            dmp.save('build/data/dump.test')
 
         with self.assertRaises(RuntimeError):
             pgdumplib.load('build/data/dump.test')
+
+    def test_table_data_finish_called_with_closed_handle(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            table_data = dump.TableData(1024, tempdir, 'UTF8')
+            table_data._handle.close()
+            table_data.finish()
+            table_data.finish()
+            self.assertFalse(table_data._handle.closed)

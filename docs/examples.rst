@@ -27,7 +27,7 @@ Writing
 -------
 
 To create a dump, you need to add sections. The following example shows how to
-create a dump with a schema, extension, comment, type, and table:
+create a dump with a schema, extension, comment, type, tables, and table data:
 
 .. code-block::
 
@@ -100,5 +100,21 @@ create a dump with a schema, extension, comment, type, and table:
         );""",
         drop_stmt='DROP TABLE test.addresses;',
         dependencies=[schema.dump_id, addr_type.dump_id, uuid_ossp.dump_id])
+
+    example = dump.add_entry(
+        'public', 'example', constants.SECTION_PRE_DATA, 'postgres',
+        'TABLE',
+        'CREATE TABLE public.example (\
+            id UUID NOT NULL PRIMARY KEY,\
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,\
+            value TEXT NOT NULL);',
+        'DROP TABLE public.example')
+
+    with dump.table_data_writer(example, ['id', 'created_at', 'value']) as writer:
+        writer.append(uuid.uuid4(), datetime.datetime.utcnow(), 'row1');
+        writer.append(uuid.uuid4(), datetime.datetime.utcnow(), 'row2');
+        writer.append(uuid.uuid4(), datetime.datetime.utcnow(), 'row3');
+        writer.append(uuid.uuid4(), datetime.datetime.utcnow(), 'row4');
+        writer.append(uuid.uuid4(), datetime.datetime.utcnow(), 'row5');
 
     dump.save('custom.dump')

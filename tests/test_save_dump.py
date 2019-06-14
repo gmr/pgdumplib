@@ -1,22 +1,25 @@
 import dataclasses
 import pathlib
 import unittest
+import uuid
+
+from dateutil import tz
+import faker
+from faker.providers import date_time
 
 import pgdumplib
-from pgdumplib import constants, dump
+from pgdumplib import constants, converters, dump
 
 
 class SavedDumpTestCase(unittest.TestCase):
 
-    @classmethod
-    def setUpClass(cls):
+    def setUp(self):
         dump = pgdumplib.load('build/data/dump.compressed')
         dump.save('build/data/dump.test')
-        cls.original = pgdumplib.load('build/data/dump.compressed')
-        cls.saved = pgdumplib.load('build/data/dump.test')
+        self.original = pgdumplib.load('build/data/dump.compressed')
+        self.saved = pgdumplib.load('build/data/dump.test')
 
-    @classmethod
-    def tearDownClass(cls) -> None:
+    def tearDown(self) -> None:
         test_file = pathlib.Path('build/data/dump.test')
         if test_file.exists():
             test_file.unlink()
@@ -35,25 +38,26 @@ class SavedDumpTestCase(unittest.TestCase):
     def test_entries_mostly_match(self):
         attrs = [e.name for e in dataclasses.fields(dump.Entry)]
         attrs.remove('offset')
-        for offset, original in enumerate(self.original.entries):
+        for original in self.original.entries:
+            saved_entry = self.saved.get_entry_by_dump_id(original.dump_id)
             for attr in attrs:
                 self.assertEqual(
                     getattr(original, attr),
-                    getattr(self.saved.entries[offset], attr),
-                    'Offset {} {} does not match: {} != {}'.format(
-                        offset, attr, getattr(original, attr),
-                        getattr(self.saved.entries[offset], attr)))
+                    getattr(saved_entry, attr),
+                    '{} does not match: {} != {}'.format(
+                        attr, getattr(original, attr),
+                        getattr(saved_entry, attr)))
 
     def test_table_data_matches(self):
         for entry in range(0, len(self.original.entries)):
             if self.original.entries[entry].desc != constants.TABLE_DATA:
                 continue
 
-            original_data = [row for row in self.original.read_data(
+            original_data = [row for row in self.original.read_table_data(
                 self.original.entries[entry].namespace,
                 self.original.entries[entry].tag)]
 
-            saved_data = [row for row in self.saved.read_data(
+            saved_data = [row for row in self.saved.read_table_data(
                 self.original.entries[entry].namespace,
                 self.original.entries[entry].tag)]
 
@@ -109,13 +113,47 @@ class CreateDumpTestCase(unittest.TestCase):
                  IS 'default administrative connection database';""",
             dependencies=[entry.dump_id])
 
+        example = dump.add_entry(
+            'public', 'example', constants.SECTION_PRE_DATA, 'postgres',
+            'TABLE',
+            'CREATE TABLE public.example (\
+              id UUID NOT NULL PRIMARY KEY, \
+              created_at TIMESTAMP WITH TIME ZONE, \
+              value TEXT NOT NULL);',
+            'DROP TABLE public.example')
+
+        columns = 'id', 'created_at', 'value'
+
+        fake = faker.Faker()
+        fake.add_provider(date_time)
+
+        rows = [
+            (uuid.uuid4(), fake.date_time(tzinfo=tz.tzutc()), 'foo'),
+            (uuid.uuid4(), fake.date_time(tzinfo=tz.tzutc()), 'bar'),
+            (uuid.uuid4(), fake.date_time(tzinfo=tz.tzutc()), 'baz'),
+            (uuid.uuid4(), fake.date_time(tzinfo=tz.tzutc()), 'qux')
+        ]
+
+        with dump.table_data_writer(example, columns) as writer:
+            for row in rows:
+                writer.append(row)
+
+        row = (uuid.uuid4(), fake.date_time(tzinfo=tz.tzutc()), None)
+        rows.append(row)
+
+        # Append a second time to get same writer
+        with dump.table_data_writer(example, columns) as writer:
+            writer.append(row)
+
         dump.save('build/data/dump.test')
 
         test_file = pathlib.Path('build/data/dump.test')
         self.assertTrue(test_file.exists())
 
-        dump = dump.load(test_file)
+        dump = pgdumplib.load(test_file, converters.SmartDataConverter)
         entry = dump.get_entry_by_dump_id(1024)
         self.assertEqual(entry.desc, 'DATABASE')
         self.assertEqual(entry.owner, 'postgres')
         self.assertEqual(entry.tag, 'postgres')
+        values = [row for row in dump.read_table_data('public', 'example')]
+        self.assertListEqual(values, rows)

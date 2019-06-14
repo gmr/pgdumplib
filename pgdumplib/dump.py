@@ -23,6 +23,7 @@ cleaned up when the :py:class:`~pgdumplib.dump.Dump` instance is released.
 """
 from __future__ import annotations
 
+import contextlib
 import dataclasses
 import datetime
 import gzip
@@ -93,6 +94,7 @@ class Dump:
         self._vmaj: int = constants.MIN_VER[0]
         self._vmin: int = constants.MIN_VER[1]
         self._vrev: int = constants.MIN_VER[2]
+        self._writers = {}
 
     def __repr__(self) -> str:
         return '<Dump format={!r} timestamp={!r} entry_count={!r}>'.format(
@@ -120,9 +122,8 @@ class Dump:
         :py:const:`pgdumplib.constants.SECTION_DATA`, or
         :py:const:`pgdumplib.constants.SECTION_POST_DATA`.
 
-        When adding data, is is advised to invoke :py:meth:`~Dump.add_data`
-        or :py:meth:`~Dump.add_blob` instead of invoking
-        :py:meth:`~Dump.add_entry` directly.
+        When adding data, use :py:meth:`~Dump.table_data_writer` instead of
+        invoking :py:meth:`~Dump.add_entry` directly.
 
         If ``dependencies`` are specified, they will be validated and if a
         ``dump_id`` is specified and no entry is found with that ``dump_id``,
@@ -134,6 +135,8 @@ class Dump:
 
         The ``dump_id`` will be auto-calculated based upon the existing entries
         if it is not specified.
+
+        .. note:: The creation of ad-hoc blobs is not supported.
 
         :param str namespace: The namespace of the entry
         :param str tag: The name/table/relation/etc of the entry
@@ -163,7 +166,7 @@ class Dump:
                     'Dependency dump_id {!r} not found'.format(dependency))
 
         if not dump_id:
-            dump_id = max(dump_ids) + 1
+            dump_id = self._next_dump_id()
 
         self.entries.append(Entry(
             dump_id, False, None, None, tag, desc, section, defn, drop_stmt,
@@ -192,8 +195,7 @@ class Dump:
             if entry.namespace == namespace and entry.tag == tag:
                 return entry
 
-    def get_entry_by_dump_id(self, dump_id: int) \
-            -> typing.Optional[Entry]:
+    def get_entry_by_dump_id(self, dump_id: int) -> typing.Optional[Entry]:
         """Return the entry for the given `dump_id`
 
         :param int dump_id: The dump ID of the entry to return.
@@ -203,21 +205,6 @@ class Dump:
         for entry in self.entries:
             if entry.dump_id == dump_id:
                 return entry
-
-    def read_data(self, namespace: str, table: str) -> tuple:
-        """Iterator that returns data for the given namespace and table
-
-        :param str namespace: The namespace/schema for the table
-        :param str table: The table name
-        :raises: :py:exc:`pgdumplib.exceptions.EntityNotFoundError`
-
-        """
-        for entry in self._data_entries:
-            if entry.namespace == namespace and entry.tag == table:
-                for row in self._read_table_data(entry):
-                    yield self._converter.convert(row)
-                return
-        raise exceptions.EntityNotFoundError(namespace=namespace, table=table)
 
     def load(self, path: str) -> Dump:
         """Load the Dumpfile, including extracting all data into a temporary
@@ -263,6 +250,21 @@ class Dump:
 
         return self
 
+    def read_table_data(self, namespace: str, table: str) -> tuple:
+        """Iterator that returns data for the given namespace and table
+
+        :param str namespace: The namespace/schema for the table
+        :param str table: The table name
+        :raises: :py:exc:`pgdumplib.exceptions.EntityNotFoundError`
+
+        """
+        for entry in self._data_entries:
+            if entry.namespace == namespace and entry.tag == table:
+                for row in self._read_table_data(entry):
+                    yield self._converter.convert(row)
+                return
+        raise exceptions.EntityNotFoundError(namespace=namespace, table=table)
+
     def save(self, path: str = None) -> None:
         """Save the Dump file to the specified path
 
@@ -276,6 +278,60 @@ class Dump:
         self._save()
         self._handle.close()
         self.load(path)
+
+    @contextlib.contextmanager
+    def table_data_writer(self, entry: Entry, columns: typing.Sequence) \
+            -> TableData:
+        """A context manager that is used to return a
+        :py:class:`~pgdumplib.dump.TableData` instance, which can be used
+        to add table data to the dump.
+
+        Example use:
+
+        .. code-block:: python
+
+            import pgdumplib
+
+            dump = pgdumplib.Dump('example')
+
+            example = dump.add_entry(
+                'public', 'example', constants.SECTION_PRE_DATA, 'postgres',
+                'TABLE',
+                'CREATE TABLE public.example (\
+                  id UUID NOT NULL PRIMARY KEY, \
+                  created_at TIMESTAMP WITH TIME ZONE, \
+                  value TEXT NOT NULL);',
+                'DROP TABLE public.example')
+
+            columns = 'id', 'created_at', 'value'
+
+            with dump.table_data_writer(example, columns) as writer:
+                writer.append(uuid.uuid4(), datetime.datetime.utcnow(), 'row1')
+                writer.append(uuid.uuid4(), datetime.datetime.utcnow(), 'row2')
+                writer.append(uuid.uuid4(), datetime.datetime.utcnow(), 'row3')
+                writer.append(uuid.uuid4(), datetime.datetime.utcnow(), 'row4')
+                writer.append(uuid.uuid4(), datetime.datetime.utcnow(), 'row5')
+
+            dump.save('example.dump')
+
+        :param Entry entry: The entry for the table to add data for
+        :param typing.Sequence columns: The ordered list of table columns
+        :rtype: TableData
+
+        """
+        if entry.dump_id not in self._writers.keys():
+            dump_id = self._next_dump_id()
+            self.entries.append(Entry(
+                dump_id=dump_id, had_dumper=True, tag=entry.tag,
+                desc=constants.TABLE_DATA, section=constants.SECTION_DATA,
+                copy_stmt='COPY {}.{} ({}) FROM stdin;'.format(
+                    entry.namespace, entry.tag, ', '.join(columns)),
+                namespace=entry.namespace, owner=entry.owner,
+                dependencies=[entry.dump_id],
+                data_state=constants.K_OFFSET_POS_NOT_SET))
+            self._writers[entry.dump_id] = TableData(
+                dump_id, self._temp_dir.name, self.encoding)
+        yield self._writers[entry.dump_id]
 
     @property
     def version(self) -> typing.Tuple[int, int, int]:
@@ -294,6 +350,14 @@ class Dump:
 
         """
         return [e for e in self.entries if e.section == constants.SECTION_DATA]
+
+    def _next_dump_id(self):
+        """Get the next ``dump_id`` that is available for adding an entry
+
+        :rtype: int
+
+        """
+        return max(e.dump_id for e in self.entries) + 1
 
     def _read_blobs(self) -> (int, bytes):
         """Read blobs, returning a tuple of the blob ID and the blob data
@@ -518,6 +582,8 @@ class Dump:
 
     def _save(self) -> None:
         """Save the dump file to disk"""
+        self.entries.sort(
+            key=lambda e: (constants.SECTION_SORT[e.section], e.dump_id))
         self._write_toc()
         self._write_data()
         self._write_toc()
@@ -534,6 +600,30 @@ class Dump:
                 self.encoding = match.group(1)
                 return
 
+    def _write_blobs(self, dump_id: int) -> int:
+        """Write the blobs for the entry.
+
+        :param int dump_id: The entry dump ID for the blobs
+        :rtype: int
+
+        """
+        path = pathlib.Path(self._temp_dir.name) / '{}.gz'.format(dump_id)
+        with gzip.open(path, 'rb') as handle:
+            self._handle.write(constants.BLK_BLOBS)
+            self._write_int(dump_id)
+            while True:
+                try:
+                    oid = struct.unpack('I', handle.read(4))[0]
+                except struct.error:
+                    break
+                length = struct.unpack('I', handle.read(4))[0]
+                self._write_int(oid)
+                self._write_int(length)
+                self._handle.write(handle.read(length))
+                self._write_int(0)
+            self._write_int(0)
+        return length
+
     def _write_byte(self, value) -> None:
         """Write a byte to the handle
 
@@ -547,48 +637,15 @@ class Dump:
         for offset, entry in enumerate(self.entries):
             if entry.section != constants.SECTION_DATA:
                 continue
-
-            self.entries[offset].data_state = constants.K_OFFSET_POS_SET
             self.entries[offset].offset = self._handle.tell()
-
-            path = pathlib.Path(self._temp_dir.name) / '{}.gz'.format(
-                entry.dump_id)
-            with gzip.open(path, 'rb') as handle:
-                if entry.desc == constants.TABLE_DATA:
-                    self._handle.write(constants.BLK_DATA)
-                    self._write_int(entry.dump_id)
-
-                    # Get the total size
-                    handle.seek(0, io.SEEK_END)
-                    size = handle.tell()
-                    if not size:
-                        self.entries[offset].data_state = \
-                            constants.K_OFFSET_NO_DATA
-                    self._write_int(size)
-
-                    # Go back to start of file
-                    handle.seek(0)
-                    if size:
-                        self._handle.write(handle.read(size))
-                    self._write_int(0)
-
-                elif entry.desc == constants.BLOBS:
-                    self._handle.write(constants.BLK_BLOBS)
-                    self._write_int(entry.dump_id)
-                    while True:
-                        try:
-                            oid = struct.unpack('I', handle.read(4))[0]
-                        except struct.error:
-                            break
-                        length = struct.unpack('I', handle.read(4))[0]
-                        self._write_int(oid)
-                        self._write_int(length)
-                        self._handle.write(handle.read(length))
-                        self._write_int(0)
-                    self._write_int(0)
-                else:
-                    raise ValueError(
-                        'Unknown block type: {}'.format(entry.desc))
+            if entry.desc == constants.TABLE_DATA:
+                size = self._write_table_data(entry.dump_id)
+            elif entry.desc == constants.BLOBS:
+                size = self._write_blobs(entry.dump_id)
+            else:
+                raise ValueError('Unknown block type: {}'.format(entry.desc))
+            if size:
+                self.entries[offset].data_state = constants.K_OFFSET_POS_SET
 
     def _write_entries(self) -> None:
         """Write the toc entries"""
@@ -671,6 +728,38 @@ class Dump:
         if value:
             self._handle.write(value)
 
+    def _write_table_data(self, dump_id: int) -> int:
+        """Write the blobs for the entry, returning the # of bytes written
+
+        :param int dump_id: The entry dump ID for the blobs
+        :rtype: int
+
+        """
+        self._handle.write(constants.BLK_DATA)
+        self._write_int(dump_id)
+
+        writer = [w for w in self._writers.values() if w.dump_id == dump_id]
+        if writer:  # Data was added ad-hoc
+            writer[0].finish()
+            LOGGER.debug('Writing from ad-hoc table data with %i',
+                         writer[0].size)
+            self._write_int(writer[0].size)
+            self._handle.write(writer[0].read())
+            self._write_int(0)  # End of data indicator
+            return writer[0].size
+
+        # Data was cached on load
+        path = pathlib.Path(self._temp_dir.name) / '{}.gz'.format(dump_id)
+        with gzip.open(path, 'rb') as handle:
+            handle.seek(0, io.SEEK_END)  # Seek to end to figure out size
+            size = handle.tell()
+            self._write_int(size)
+            if size:
+                handle.seek(0)  # Rewind to read data
+                self._handle.write(handle.read())
+        self._write_int(0)  # End of data indicator
+        return size
+
     def _write_timestamp(self, value) -> None:
         """Write a datetime.datetime value
 
@@ -745,3 +834,79 @@ class Entry:
     dependencies: list = dataclasses.field(default_factory=list)
     data_state: int = constants.K_OFFSET_NO_DATA
     offset: int = 0
+
+
+class TableData:
+    """Used to encapsulate table data using temporary file and allowing
+    for an API that allows for the appending of data one row at a time.
+
+    Do not create this class directly, instead invoke
+    :py:meth:`~pgdumplib.dump.Dump.table_data_writer`.
+
+    """
+    def __init__(self, dump_id, tempdir, encoding):
+        self.dump_id = dump_id
+        self._encoding = encoding
+        self._path = pathlib.Path(tempdir) / '{}.gz'.format(dump_id)
+        self._handle = gzip.open(self._path, 'wb')
+
+    def append(self, row: typing.Sequence) -> None:
+        """Append a row to the table data
+
+        All columns will be coerced to a string with special attention
+        paid to ``None``, converting it to the null marker (``\\N``) and
+        :py:class:`datetime.datetime` objects, which will have the proper
+        pg_dump timestamp format applied to them.
+
+        :param typing.Sequence row: The row to append
+
+        """
+        row = '\t'.join([self._convert(c) for c in row])
+        self._handle.write('{}\n'.format(row).encode(self._encoding))
+
+    def finish(self):
+        """Invoked prior to saving a dump to close the temporary data
+        handle and switch the class into read-only mode.
+
+        For use by :py:class:`pgdumplib.dump.Dump` only.
+
+        """
+        if not self._handle.closed:
+            self._handle.close()
+        self._handle = gzip.open(self._path, 'rb')
+
+    def read(self):
+        """Read the data from disk for writing to the dump
+
+        For use by :py:class:`pgdumplib.dump.Dump` only.
+
+        :rtype: bytes
+
+        """
+        self._handle.seek(0)
+        return self._handle.read()
+
+    @property
+    def size(self):
+        """Return the current size of the data on disk
+
+        :rtype: int
+
+        """
+        self._handle.seek(0, io.SEEK_END)  # Seek to end to figure out size
+        size = self._handle.tell()
+        self._handle.seek(0)
+        return size
+
+    @staticmethod
+    def _convert(column: typing.Any) -> str:
+        """Convert the column to a string
+
+        :param any column: The column to convert
+
+        """
+        if isinstance(column, datetime.datetime):
+            return column.strftime(constants.PGDUMP_STRFTIME_FMT)
+        elif column is None:
+            return '\\N'
+        return str(column)

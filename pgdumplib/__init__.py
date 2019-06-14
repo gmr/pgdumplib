@@ -12,9 +12,8 @@ def load(filepath: str, converter=None):
     """Load a pg_dump file created with -Fd from disk
 
     :param str filepath: The path to the dump to load
-    :param converter: The data converter class to use
+    :param class converter: The data converter class to use
         (Default: :py:class:`pgdumplib.converters.DataConverter`)
-    :type converter: :py:class:`pgdumplib.converters.DataConverter`
     :raises: :py:exc:`ValueError`
     :rtype: :py:class:`pgdumplib.dump.Dump`
 
