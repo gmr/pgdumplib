@@ -136,14 +136,14 @@ class CreateDumpTestCase(unittest.TestCase):
 
         with dump.table_data_writer(example, columns) as writer:
             for row in rows:
-                writer.append(row)
+                writer.append(*row)
 
         row = (uuid.uuid4(), fake.date_time(tzinfo=tz.tzutc()), None)
         rows.append(row)
 
         # Append a second time to get same writer
         with dump.table_data_writer(example, columns) as writer:
-            writer.append(row)
+            writer.append(*row)
 
         dump.save('build/data/dump.test')
 

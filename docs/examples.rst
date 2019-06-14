@@ -30,6 +30,8 @@ To create a dump, you need to add sections. The following example shows how to
 create a dump with a schema, extension, comment, type, tables, and table data:
 
 .. code-block::
+    import datetime
+    import uuid
 
     import pgdumplib
     from pgdumplib import constants

@@ -286,33 +286,7 @@ class Dump:
         :py:class:`~pgdumplib.dump.TableData` instance, which can be used
         to add table data to the dump.
 
-        Example use:
-
-        .. code-block:: python
-
-            import pgdumplib
-
-            dump = pgdumplib.Dump('example')
-
-            example = dump.add_entry(
-                'public', 'example', constants.SECTION_PRE_DATA, 'postgres',
-                'TABLE',
-                'CREATE TABLE public.example (\
-                  id UUID NOT NULL PRIMARY KEY, \
-                  created_at TIMESTAMP WITH TIME ZONE, \
-                  value TEXT NOT NULL);',
-                'DROP TABLE public.example')
-
-            columns = 'id', 'created_at', 'value'
-
-            with dump.table_data_writer(example, columns) as writer:
-                writer.append(uuid.uuid4(), datetime.datetime.utcnow(), 'row1')
-                writer.append(uuid.uuid4(), datetime.datetime.utcnow(), 'row2')
-                writer.append(uuid.uuid4(), datetime.datetime.utcnow(), 'row3')
-                writer.append(uuid.uuid4(), datetime.datetime.utcnow(), 'row4')
-                writer.append(uuid.uuid4(), datetime.datetime.utcnow(), 'row5')
-
-            dump.save('example.dump')
+        When invoked for a given entry containing the table definition,
 
         :param Entry entry: The entry for the table to add data for
         :param typing.Sequence columns: The ordered list of table columns
@@ -850,18 +824,19 @@ class TableData:
         self._path = pathlib.Path(tempdir) / '{}.gz'.format(dump_id)
         self._handle = gzip.open(self._path, 'wb')
 
-    def append(self, row: typing.Sequence) -> None:
-        """Append a row to the table data
+    def append(self, *args) -> None:
+        """Append a row to the table data, passing columns in as args
+
+        Column order must match the order specified when
+        :py:meth:`~pgdumplib.dump.Dump.table_data_writer` was invoked.
 
         All columns will be coerced to a string with special attention
         paid to ``None``, converting it to the null marker (``\\N``) and
         :py:class:`datetime.datetime` objects, which will have the proper
         pg_dump timestamp format applied to them.
 
-        :param typing.Sequence row: The row to append
-
         """
-        row = '\t'.join([self._convert(c) for c in row])
+        row = '\t'.join([self._convert(c) for c in args])
         self._handle.write('{}\n'.format(row).encode(self._encoding))
 
     def finish(self):
