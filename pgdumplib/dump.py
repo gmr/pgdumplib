@@ -289,7 +289,8 @@ class Dump:
         When invoked for a given entry containing the table definition,
 
         :param Entry entry: The entry for the table to add data for
-        :param typing.Sequence columns: The ordered list of table columns
+        :param columns: The ordered list of table columns
+        :type columns: list or tuple
         :rtype: TableData
 
         """
