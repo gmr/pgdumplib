@@ -29,7 +29,8 @@ Writing
 To create a dump, you need to add sections. The following example shows how to
 create a dump with a schema, extension, comment, type, tables, and table data:
 
-.. code-block::
+.. code-block:: python
+
     import datetime
     import uuid
 
