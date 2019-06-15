@@ -171,31 +171,31 @@ class Dump:
         self.entries.append(Entry(
             dump_id, False, None, None, tag, desc, section, defn, drop_stmt,
             copy_stmt, namespace, tablespace, owner, False, dependencies))
-
-        LOGGER.debug('Appended entry #%i: %r',
-                     len(self.entries), self.entries[-1])
         return self.entries[-1]
 
-    def get_entry(self,
-                  namespace: str, tag: str,
-                  section: str = constants.SECTION_PRE_DATA) \
-            -> typing.Optional[Entry]:
-        """Return the entry for the given namespace and tag
+    def blobs(self) -> typing.Tuple[int, bytes]:
+        """Iterator that returns each blob in the dump
 
-        :param str namespace: The namespace of the entry
-        :param str tag: The tag/relation/table name
-        :param str section: The dump section the entry is for
-        :raises: :py:exc:`ValueError`
-        :rtype: pgdumplib.dump.Entry or None
+        :rtype: tuple(int, bytes)
 
         """
-        if section not in constants.SECTIONS:
-            raise ValueError('Invalid section: {}'.format(section))
-        for entry in [e for e in self.entries if e.section == section]:
-            if entry.namespace == namespace and entry.tag == tag:
-                return entry
+        def read_oid(fd):
+            """Small helper function to deduplicate code"""
+            try:
+                return struct.unpack('I', fd.read(4))[0]
+            except struct.error:
+                return
 
-    def get_entry_by_dump_id(self, dump_id: int) -> typing.Optional[Entry]:
+        for entry in self._data_entries:
+            if entry.desc == constants.BLOBS:
+                with self._tempfile(entry.dump_id, 'rb') as handle:
+                    oid = read_oid(handle)
+                    while oid:
+                        length = struct.unpack('I', handle.read(4))[0]
+                        yield oid, handle.read(length)
+                        oid = read_oid(handle)
+
+    def get_entry(self, dump_id: int) -> typing.Optional[Entry]:
         """Return the entry for the given `dump_id`
 
         :param int dump_id: The dump ID of the entry to return.
@@ -210,6 +210,7 @@ class Dump:
         """Load the Dumpfile, including extracting all data into a temporary
         directory
 
+        :raises: :py:exc:`RuntimeError`
         :raises: :py:exc:`ValueError`
 
         """
@@ -233,37 +234,42 @@ class Dump:
         self._read_entries()
         self._set_encoding()
 
-        # Write out data entries
+        # Cache table data and blobs
         for entry in self._data_entries:
-            path = pathlib.Path(self._temp_dir.name) / '{}.gz'.format(
-                entry.dump_id)
-            with gzip.open(path, 'wb') as handle:
-                if entry.desc == constants.BLOBS:
-                    for oid, blob in self._read_entry_data(entry):
-                        handle.write(struct.pack('I', oid))
-                        handle.write(struct.pack('I', len(blob)))
-                        handle.write(blob)
-                else:
-                    data = self._read_entry_data(entry)
-                    if data:
-                        handle.write(data)
-
+            if entry.data_state == constants.K_OFFSET_NO_DATA:
+                continue
+            elif entry.data_state != constants.K_OFFSET_POS_SET:
+                raise RuntimeError('Unsupported data format')
+            self._handle.seek(entry.offset, io.SEEK_SET)
+            block_type, dump_id = self._read_block_header()
+            if dump_id != entry.dump_id:
+                raise RuntimeError('Dump IDs do not match ({} != {}'.format(
+                    dump_id, entry.dump_id))
+            if block_type == constants.BLK_DATA:
+                self._cache_table_data(dump_id)
+            elif block_type == constants.BLK_BLOBS:
+                self._cache_blobs(dump_id)
+            else:
+                raise RuntimeError('Unknown block type: {}'.format(block_type))
         return self
 
-    def read_table_data(self, namespace: str, table: str) -> tuple:
-        """Iterator that returns data for the given namespace and table
+    def lookup_entry(self, namespace: str, tag: str,
+                     section: str = constants.SECTION_PRE_DATA) \
+            -> typing.Optional[Entry]:
+        """Return the entry for the given namespace and tag
 
-        :param str namespace: The namespace/schema for the table
-        :param str table: The table name
-        :raises: :py:exc:`pgdumplib.exceptions.EntityNotFoundError`
+        :param str namespace: The namespace of the entry
+        :param str tag: The tag/relation/table name
+        :param str section: The dump section the entry is for
+        :raises: :py:exc:`ValueError`
+        :rtype: pgdumplib.dump.Entry or None
 
         """
-        for entry in self._data_entries:
-            if entry.namespace == namespace and entry.tag == table:
-                for row in self._read_table_data(entry):
-                    yield self._converter.convert(row)
-                return
-        raise exceptions.EntityNotFoundError(namespace=namespace, table=table)
+        if section not in constants.SECTIONS:
+            raise ValueError('Invalid section: {}'.format(section))
+        for entry in [e for e in self.entries if e.section == section]:
+            if entry.namespace == namespace and entry.tag == tag:
+                return entry
 
     def save(self, path: str = None) -> None:
         """Save the Dump file to the specified path
@@ -279,9 +285,24 @@ class Dump:
         self._handle.close()
         self.load(path)
 
+    def table_data(self, namespace: str, table: str) -> tuple:
+        """Iterator that returns data for the given namespace and table
+
+        :param str namespace: The namespace/schema for the table
+        :param str table: The table name
+        :raises: :py:exc:`pgdumplib.exceptions.EntityNotFoundError`
+
+        """
+        for entry in self._data_entries:
+            if entry.namespace == namespace and entry.tag == table:
+                for row in self._read_table_data(entry):
+                    yield self._converter.convert(row)
+                return
+        raise exceptions.EntityNotFoundError(namespace=namespace, table=table)
+
     @contextlib.contextmanager
-    def table_data_writer(self, entry: Entry, columns: typing.Sequence) \
-            -> TableData:
+    def table_data_writer(
+            self, entry: Entry, columns: typing.Sequence) -> TableData:
         """A context manager that is used to return a
         :py:class:`~pgdumplib.dump.TableData` instance, which can be used
         to add table data to the dump.
@@ -317,6 +338,29 @@ class Dump:
         """
         return self._vmaj, self._vmin, self._vrev
 
+    def _cache_blobs(self, dump_id):
+        """Create a temp cache file for blob data
+
+        :param int dump_id: The dump ID for the filename
+
+        """
+        count = 0
+        with self._tempfile(dump_id, 'wb') as handle:
+            for oid, blob in self._read_blobs():
+                handle.write(struct.pack('I', oid))
+                handle.write(struct.pack('I', len(blob)))
+                handle.write(blob)
+                count += 1
+
+    def _cache_table_data(self, dump_id):
+        """Create a temp cache file for the table data
+
+        :param int dump_id: The dump ID for the filename
+
+        """
+        with self._tempfile(dump_id, 'wb') as handle:
+            handle.write(self._read_data())
+
     @property
     def _data_entries(self) -> typing.List[Entry]:
         """Return the list of entries that are in the data section
@@ -338,13 +382,16 @@ class Dump:
         """Read blobs, returning a tuple of the blob ID and the blob data
 
         :rtype: (int, bytes)
+        :raises: :exc:`RuntimeError`
 
         """
         oid = self._read_int()
-        while oid:
-            buffer = self._read_data()
-            yield oid, buffer
+        while oid is not None and oid > 0:
+            data = self._read_data()
+            yield oid, data
             oid = self._read_int()
+            if oid == 0:
+                oid = self._read_int()
 
     def _read_block_header(self) -> (bytes, int):
         """Read the block header in
@@ -360,7 +407,10 @@ class Dump:
         :rtype: int
 
         """
-        return struct.unpack('B', self._handle.read(1))[0]
+        try:
+            return struct.unpack('B', self._handle.read(1))[0]
+        except struct.error:
+            pass
 
     def _read_bytes(self) -> bytes:
         """Read in a byte stream
@@ -430,32 +480,6 @@ class Dump:
             values.add(int(value))
         return sorted(list(values))
 
-    def _read_entry_data(self, entry) -> typing.Optional[None, bytes, tuple]:
-        """Read the data from the entry
-
-        :param pgdumplib.dump.Entry entry: The entry to read
-        :raises: :exc:`RuntimeError`
-
-        """
-        LOGGER.debug('Reading entry data for %i %s %s (%s) @ %i',
-                     entry.dump_id, entry.namespace, entry.tag, entry.desc,
-                     entry.offset)
-        if entry.data_state == constants.K_OFFSET_NO_DATA:
-            return b''
-        elif entry.data_state != constants.K_OFFSET_POS_SET:
-            raise RuntimeError('Unsupported data format')
-        self._handle.seek(entry.offset, io.SEEK_SET)
-        block_type, dump_id = self._read_block_header()
-        if dump_id != entry.dump_id:
-            raise RuntimeError('Dump IDs do not match ({} != {}'.format(
-                dump_id, entry.dump_id))
-        if block_type == constants.BLK_DATA:
-            return self._read_data()
-        elif block_type == constants.BLK_BLOBS:
-            return self._read_blobs()
-        else:
-            raise RuntimeError('Unknown block type: {}'.format(block_type))
-
     def _read_entries(self) -> None:
         """Read in all of the entries"""
         entries = self._read_int()
@@ -500,13 +524,15 @@ class Dump:
         self._format = constants.FORMATS[struct.unpack(
             'B', self._handle.read(1))[0]]
 
-    def _read_int(self) -> int:
+    def _read_int(self) -> typing.Optional[int]:
         """Read in a signed integer
 
-        :rtype: int
+        :rtype: int or None
 
         """
         sign = self._read_byte()
+        if sign is None:
+            return
         bs, bv, value = 0, 0, 0
         for offset in range(0, self._intsize):
             bv = self._read_byte() & 0xFF
@@ -534,13 +560,15 @@ class Dump:
         :rtype: str
 
         """
-        data = self._read_entry_data(entry).decode(self.encoding).split('\n')
-        if len(data) == 1 and not data[0]:
-            data = []
-        for line in data:
-            if line.startswith('\\.') or not line:
-                break
-            yield line
+        try:
+            with self._tempfile(entry.dump_id, 'rb') as handle:
+                for line in handle:
+                    line = (line or b'').decode(self.encoding).strip()
+                    if line.startswith('\\.') or not line:
+                        break
+                    yield line
+        except exceptions.NoDataError:
+            pass
 
     def _read_timestamp(self) -> datetime.datetime:
         """Read in the timestamp from handle.
@@ -570,10 +598,23 @@ class Dump:
         """
         for entry in self.entries:
             if entry.desc == constants.ENCODING:
-                LOGGER.debug('Matched on encoding')
                 match = ENCODING_PATTERN.match(entry.defn)
                 self.encoding = match.group(1)
                 return
+
+    @contextlib.contextmanager
+    def _tempfile(self, dump_id, mode):
+        """Open the temp file for the specified dump_id in the specified mode
+
+        :param int dump_id: The dump_id for the temp file
+        :param str mode: The mode (rb, wb)
+
+        """
+        path = pathlib.Path(self._temp_dir.name) / '{}.gz'.format(dump_id)
+        if not path.exists() and mode.startswith('r'):
+            raise exceptions.NoDataError()
+        with gzip.open(path, mode) as handle:
+            yield handle
 
     def _write_blobs(self, dump_id: int) -> int:
         """Write the blobs for the entry.
@@ -582,8 +623,7 @@ class Dump:
         :rtype: int
 
         """
-        path = pathlib.Path(self._temp_dir.name) / '{}.gz'.format(dump_id)
-        with gzip.open(path, 'rb') as handle:
+        with self._tempfile(dump_id, 'rb') as handle:
             self._handle.write(constants.BLK_BLOBS)
             self._write_int(dump_id)
             while True:
@@ -635,9 +675,6 @@ class Dump:
         :param pgdumplib.dump.Entry entry:
 
         """
-        LOGGER.debug(
-            'Writing %i %s %s %s %r',
-            entry.dump_id, entry.desc, entry.namespace, entry.tag, entry.defn)
         self._write_int(entry.dump_id)
         self._write_int(int(entry.had_dumper))
         self._write_str(entry.table_oid or '0')
@@ -716,16 +753,13 @@ class Dump:
         writer = [w for w in self._writers.values() if w.dump_id == dump_id]
         if writer:  # Data was added ad-hoc
             writer[0].finish()
-            LOGGER.debug('Writing from ad-hoc table data with %i',
-                         writer[0].size)
             self._write_int(writer[0].size)
             self._handle.write(writer[0].read())
             self._write_int(0)  # End of data indicator
             return writer[0].size
 
         # Data was cached on load
-        path = pathlib.Path(self._temp_dir.name) / '{}.gz'.format(dump_id)
-        with gzip.open(path, 'rb') as handle:
+        with self._tempfile(dump_id, 'rb') as handle:
             handle.seek(0, io.SEEK_END)  # Seek to end to figure out size
             size = handle.tell()
             self._write_int(size)

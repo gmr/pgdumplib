@@ -39,7 +39,7 @@ class SavedDumpTestCase(unittest.TestCase):
         attrs = [e.name for e in dataclasses.fields(dump.Entry)]
         attrs.remove('offset')
         for original in self.original.entries:
-            saved_entry = self.saved.get_entry_by_dump_id(original.dump_id)
+            saved_entry = self.saved.get_entry(original.dump_id)
             for attr in attrs:
                 self.assertEqual(
                     getattr(original, attr),
@@ -53,11 +53,11 @@ class SavedDumpTestCase(unittest.TestCase):
             if self.original.entries[entry].desc != constants.TABLE_DATA:
                 continue
 
-            original_data = [row for row in self.original.read_table_data(
+            original_data = [row for row in self.original.table_data(
                 self.original.entries[entry].namespace,
                 self.original.entries[entry].tag)]
 
-            saved_data = [row for row in self.saved.read_table_data(
+            saved_data = [row for row in self.saved.table_data(
                 self.original.entries[entry].namespace,
                 self.original.entries[entry].tag)]
 
@@ -151,9 +151,9 @@ class CreateDumpTestCase(unittest.TestCase):
         self.assertTrue(test_file.exists())
 
         dump = pgdumplib.load(test_file, converters.SmartDataConverter)
-        entry = dump.get_entry_by_dump_id(1024)
+        entry = dump.get_entry(1024)
         self.assertEqual(entry.desc, 'DATABASE')
         self.assertEqual(entry.owner, 'postgres')
         self.assertEqual(entry.tag, 'postgres')
-        values = [row for row in dump.read_table_data('public', 'example')]
+        values = [row for row in dump.table_data('public', 'example')]
         self.assertListEqual(values, rows)

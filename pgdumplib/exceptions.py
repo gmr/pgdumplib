@@ -8,6 +8,10 @@ class PgDumpLibException(Exception):
     """Common Base Exception"""
 
 
+class NoDataError(PgDumpLibException):
+    """Raised when attempting to work with data when do data entries exist"""
+
+
 class EntityNotFoundError(PgDumpLibException):
     """Raised when an attempt is made to read data from a relation in a
     dump file but it is not found in the table of contents.

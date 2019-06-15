@@ -4,7 +4,7 @@ Version History
 +---------+------------+------------------------------------------------------------------+
 | Version | Date       | Release Notes                                                    |
 +=========+============+==================================================================+
-| 1.0.0   | 2019-06-13 | - Full read/write support of custom formatted pg_dump files      |
+| 1.0.0   | 2019-06-14 | - Full read/write support of custom formatted pg_dump files      |
 |         |            | - Refactored API                                                 |
 +---------+------------+------------------------------------------------------------------+
 | 0.2.1   | 2019-01-15 | Documentation and docstring updates                              |

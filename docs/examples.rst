@@ -19,9 +19,9 @@ from a dump:
     import pgdumplib
 
     dump = pgdumplib.load('dump.out')
-    for row in dump.read_data('public', 'table-name'):
+    for row in dump.table_data('public', 'table-name'):
         print(row)
-    print(dump.get_entry('public', 'table-name').defn)
+    print(dump.lookup_entry('public', 'table-name').defn)
 
 Writing
 -------

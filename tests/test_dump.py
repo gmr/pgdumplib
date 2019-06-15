@@ -2,6 +2,7 @@
 import dataclasses
 import datetime
 import logging
+import os
 import pathlib
 import re
 import subprocess
@@ -12,11 +13,14 @@ import uuid
 
 import arrow
 from dateutil import tz
+import psycopg2
 
 import pgdumplib
 from pgdumplib import constants, converters, dump, exceptions
 
 LOGGER = logging.getLogger(__name__)
+
+BLOB_COUNT_SQL = 'SELECT COUNT(*) FROM test.users WHERE icon IS NOT NULL;'
 
 PATTERNS = {
     'timestamp': re.compile(r'\s+Archive created at (.*)\r\n'),
@@ -56,43 +60,59 @@ class TestCase(unittest.TestCase):
         cls.dump = pgdumplib.load(
             pathlib.Path('build') / 'data' / cls.PATH, cls.CONVERTER)
 
-    def test_read_table_data(self):
+    def test_table_data(self):
         data = []
-        for line in self.dump.read_table_data('public', 'pgbench_accounts'):
+        for line in self.dump.table_data('public', 'pgbench_accounts'):
             data.append(line)
         self.assertEqual(len(data), 100000)
 
-    def test_read_table_data_empty(self):
+    def test_table_data_empty(self):
         data = []
-        for line in self.dump.read_table_data('test', 'empty_table'):
+        for line in self.dump.table_data('test', 'empty_table'):
             data.append(line)
         self.assertEqual(len(data), 0)
 
     def test_read_dump_entity_not_found(self):
         with self.assertRaises(exceptions.EntityNotFoundError):
-            for line in self.dump.read_table_data('public', 'foo'):
+            for line in self.dump.table_data('public', 'foo'):
                 LOGGER.debug('Line: %r', line)
 
-    def test_get_entry(self):
-        entry = self.dump.get_entry('public', 'pgbench_accounts')
+    def test_lookup_entry(self):
+        entry = self.dump.lookup_entry('public', 'pgbench_accounts')
         self.assertEqual(entry.namespace, 'public')
         self.assertEqual(entry.tag, 'pgbench_accounts')
         self.assertEqual(entry.section, constants.SECTION_PRE_DATA)
 
-    def test_get_entry_not_found(self):
-        self.assertIsNone(self.dump.get_entry('public', 'foo'))
+    def test_lookup_entry_not_found(self):
+        self.assertIsNone(self.dump.lookup_entry('public', 'foo'))
 
-    def test_get_entry_invalid_section(self):
+    def test_lookup_entry_invalid_section(self):
         with self.assertRaises(ValueError):
-            self.dump.get_entry('public', 'pgbench_accounts', 'BAD SECTION')
+            self.dump.lookup_entry('public', 'pgbench_accounts', 'BAD SECTION')
 
-    def test_get_entry_by_dump_id(self):
-        entry = self.dump.get_entry('public', 'pgbench_accounts')
-        self.assertEqual(self.dump.get_entry_by_dump_id(entry.dump_id), entry)
+    def test_get_entry(self):
+        entry = self.dump.lookup_entry('public', 'pgbench_accounts')
+        self.assertEqual(self.dump.get_entry(entry.dump_id), entry)
 
-    def test_get_entry_by_dump_id_not_found(self):
+    def test_get_entry_not_found(self):
         dump_id = max(entry.dump_id for entry in self.dump.entries) + 100
-        self.assertIsNone(self.dump.get_entry_by_dump_id(dump_id))
+        self.assertIsNone(self.dump.get_entry(dump_id))
+
+    def test_read_blobs(self):
+        conn = psycopg2.connect(os.environ['POSTGRES_URI'])
+        cursor = conn.cursor()
+        cursor.execute(BLOB_COUNT_SQL)
+        expectation = cursor.fetchone()[0]
+        conn.close()
+
+        dmp = pgdumplib.load(
+            pathlib.Path('build') / 'data' / self.PATH, self.CONVERTER)
+        blobs = []
+        for oid, blob in dmp.blobs():
+            self.assertIsInstance(oid, int)
+            self.assertIsInstance(blob, bytes)
+            blobs.append((oid, blob))
+        self.assertEqual(len(blobs), expectation)
 
 
 class CompressedTestCase(TestCase):
@@ -107,7 +127,7 @@ class InsertsTestCase(TestCase):
 
     def test_read_dump_data(self):
         count = 0
-        for line in self.dump.read_table_data('public', 'pgbench_accounts'):
+        for line in self.dump.table_data('public', 'pgbench_accounts'):
             self.assertTrue(
                 line.startswith('INSERT INTO public.pgbench_accounts'),
                 'Unexpected start @ row {}: {!r}'.format(count, line))
@@ -120,13 +140,16 @@ class NoDataTestCase(TestCase):
     HAS_DATA = False
     PATH = 'dump.no-data'
 
-    def test_read_table_data(self):
+    def test_table_data(self):
         with self.assertRaises(exceptions.EntityNotFoundError):
-            super().test_read_table_data()
+            super().test_table_data()
 
-    def test_read_table_data_empty(self):
+    def test_table_data_empty(self):
         with self.assertRaises(exceptions.EntityNotFoundError):
-            super().test_read_table_data_empty()
+            super().test_table_data_empty()
+
+    def test_read_blobs(self):
+        self.assertEqual(len([b for b in self.dump.blobs()]), 0)
 
 
 class ErrorsTestCase(unittest.TestCase):

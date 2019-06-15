@@ -108,8 +108,8 @@ class EdgeTestCase(unittest.TestCase):
         dmp.save('build/data/dump.test')
 
         dmp = pgdumplib.load('build/data/dump.test')
-        data = [line for line in dmp.read_table_data('bad', 'empty_table')]
-        self.assertListEqual(data, [])
+        data = [line for line in dmp.table_data('bad', 'empty_table')]
+        self.assertEqual(len(data), 0)
 
     def test_runtime_error_when_pos_not_set(self):
         dmp = pgdumplib.new('test')

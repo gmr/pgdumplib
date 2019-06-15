@@ -8,7 +8,7 @@ Python3 library for reading and writing pg_dump files using the custom format.
 Installation
 ------------
 
-.. code::
+.. code-block:: bash
 
     pip install pgdumplib
 
@@ -18,11 +18,11 @@ Example Usage
 The following example shows how to create a dump and then read it in, and
 iterate through the data of one of the tables.
 
-.. code::
+.. code-block:: python
 
     pg_dump -d pgbench -Fc -f pgbench.dump
 
-.. code::
+.. code-block:: python
 
     import pgdumplib
 
@@ -33,7 +33,7 @@ iterate through the data of one of the tables.
     print('Server Version: {}'.format(dump.toc.server_version))
     print('Dump Version: {}'.format(dump.toc.dump_version))
 
-    for line in dump.read_data('public', 'pgbench_accounts'):
+    for line in dump.table_data('public', 'pgbench_accounts'):
         print(line)
 
 .. |Version| image:: https://img.shields.io/pypi/v/pgdumplib.svg?
