@@ -69,14 +69,10 @@ jobs:
             echo -e "username = crad" >> ~/.pypirc
             echo -e "password = $PYPI_PASSWORD" >> ~/.pypirc
       - run:
-          name: install twine
+          name: deploy to pypi
           command: |
+            python3 -m venv env
+            source env/bin/activate
             pip3 install twine
-      - run:
-          name: create package
-          command: |
             python3 setup.py bdist
-      - run:
-          name: upload to pypi
-          command: |
             twine upload dist/*
