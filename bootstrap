@@ -96,7 +96,7 @@ export PGHOST=${TEST_HOST}
 export PGPORT=${PGPORT}
 export PGDATABASE=postgres
 export PGUSER=postgres
-export POSTGRES_URI=postgresql://postgres@${PGPORT}/
+export POSTGRES_URI=postgresql://postgres@${TEST_HOST}:${PGPORT}/postgres
 EOF
 
 printf "\nBootstrap complete\n\nDon't forget to \". build/test-environment\"\n"
