@@ -13,6 +13,7 @@ Creating your own data converter is easy and should simply extend the
 :py:class:`DataConverter` class.
 
 """
+import datetime
 import decimal
 import ipaddress
 import typing
@@ -33,7 +34,7 @@ class DataConverter:
 
     """
     @staticmethod
-    def convert(row: str) -> tuple:
+    def convert(row: str) -> typing.Tuple[typing.Union[str, None], ...]:
         """Convert the string based row into a tuple of columns.
 
         :param str row: The row to convert
@@ -56,6 +57,13 @@ class NoOpConverter:
         return row
 
 
+SmartColumn = typing.Union[
+    None, str, int, decimal.Decimal,
+    ipaddress.IPv4Network, ipaddress.IPv4Address,
+    ipaddress.IPv6Network, ipaddress.IPv6Address,
+    uuid.UUID, datetime.datetime]
+
+
 class SmartDataConverter(DataConverter):
     """Attempts to convert columns to native Python data types
 
@@ -76,7 +84,8 @@ class SmartDataConverter(DataConverter):
         - :py:class:`uuid.UUID`
 
     """
-    def convert(self, row: str) -> tuple:
+    def convert(self, row: str) \
+            -> typing.Tuple[SmartColumn, ...]:
         """Convert the string based row into a tuple of columns.
 
         :param str row: The row to convert
@@ -86,7 +95,7 @@ class SmartDataConverter(DataConverter):
         return tuple(self._convert_column(c) for c in row.split('\t'))
 
     @staticmethod
-    def _convert_column(column: str) -> typing.Any:
+    def _convert_column(column: str) -> SmartColumn:
         """Attempt to convert the column from a string if appropriate
 
         :param str column: The column to attempt to convert

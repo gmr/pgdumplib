@@ -5,7 +5,7 @@ instance from a :command:`pg_dump` file created in the `custom` format.
 See the :doc:`examples` page to see how to read a dump or create one.
 
 """
-version = '1.0.0'
+version = '1.0.1'
 
 
 def load(filepath: str, converter=None):
@@ -14,8 +14,9 @@ def load(filepath: str, converter=None):
     :param str filepath: The path to the dump to load
     :param class converter: The data converter class to use
         (Default: :py:class:`pgdumplib.converters.DataConverter`)
+    :type converter: pgdumplib.converters.DataConverter or None
     :raises: :py:exc:`ValueError`
-    :rtype: :py:class:`pgdumplib.dump.Dump`
+    :rtype: pgdumplib.dump.Dump
 
     """
     from pgdumplib import dump
@@ -31,7 +32,8 @@ def new(dbname: str = 'pgdumplib', encoding: str = 'UTF8',
     :param str encoding: The data encoding (Default: ``UTF8``)
     :param converter: The data converter class to use
         (Default: :py:class:`pgdumplib.converters.DataConverter`)
-    :rtype: :py:class:`pgdumplib.dump.Dump`
+    :type converter: pgdumplib.converters.DataConverter or None
+    :rtype: pgdumplib.dump.Dump
 
     """
     from pgdumplib import dump

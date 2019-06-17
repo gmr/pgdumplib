@@ -132,3 +132,11 @@ class EdgeTestCase(unittest.TestCase):
             table_data.finish()
             table_data.finish()
             self.assertFalse(table_data._handle.closed)
+
+    def test_bad_encoding(self):
+        dmp = pgdumplib.new('test')
+        dmp.entries[0].defn = 'BAD ENTRY WILL FAIL'
+        dmp.save('build/data/dump.test')
+
+        dmp = pgdumplib.load('build/data/dump.test')
+        self.assertEqual(dmp.encoding, 'UTF8')
