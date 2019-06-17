@@ -74,5 +74,5 @@ jobs:
             python3 -m venv env
             source env/bin/activate
             pip3 install twine
-            python3 setup.py bdist
+            python3 setup.py sdist
             twine upload dist/*
