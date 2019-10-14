@@ -88,7 +88,7 @@ class Dump:
         converter = converter or converters.DataConverter
         self._converter: converters.DataConverter = converter()
         self._format: str = 'Custom'
-        self._handle: typing.BinaryIO
+        self._handle: typing.Optional[typing.BinaryIO] = None
         self._intsize: int = 4
         self._offsize: int = 8
         self._temp_dir = tempfile.TemporaryDirectory()
