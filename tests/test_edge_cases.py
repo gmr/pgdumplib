@@ -1,4 +1,5 @@
 import gzip
+import logging
 import pathlib
 import struct
 import tempfile
@@ -7,6 +8,8 @@ from unittest import mock
 
 import pgdumplib
 from pgdumplib import constants, dump
+
+LOGGER = logging.getLogger(__name__)
 
 
 class EdgeTestCase(unittest.TestCase):
@@ -29,39 +32,19 @@ class EdgeTestCase(unittest.TestCase):
         if test_file.exists():
             test_file.unlink()
 
-    def test_invalid_data_type(self):
-        dmp = pgdumplib.new('test')
-        dmp.add_entry(
-            'bad', 'entry_desc', constants.SECTION_DATA, None, 'INVALID')
-        with gzip.open(
-                pathlib.Path(dmp._temp_dir.name) / '4.gz', 'wb') as handle:
-            handle.write(b'BADDATASHOULDBLOWUPHARD')
-
-        with self.assertRaises(ValueError):
-            dmp.save('build/data/dump.test')
-
-    def test_invalid_section(self):
-        dmp = pgdumplib.new('test')
-        with self.assertRaises(ValueError):
-            dmp.add_entry('bad', 'block_table', 'INVALID')
-
     def test_invalid_dependency(self):
         dmp = pgdumplib.new('test')
         with self.assertRaises(ValueError):
-            dmp.add_entry('bad', 'block_table', dependencies=[1024])
+            dmp.add_entry(constants.TABLE, '', 'block_table',
+                          dependencies=[1024])
 
     def test_invalid_block_type_in_data(self):
         dmp = pgdumplib.new('test')
-        dmp.add_entry(
-            'bad', 'block_table', constants.SECTION_DATA, None,
-            constants.TABLE_DATA, dump_id=1024)
-        with gzip.open(
-                pathlib.Path(dmp._temp_dir.name) / '1024.gz', 'wb') as handle:
-            handle.write(b'1\t\1\t\1\n')
-
+        dmp.add_entry(constants.TABLE_DATA, '', 'block_table', dump_id=128)
+        with gzip.open(pathlib.Path(dmp._temp_dir.name) / '128.gz', 'wb') as h:
+            h.write(b'1\t\1\t\1\n')
         with mock.patch('pgdumplib.constants.BLK_DATA', b'\x02'):
             dmp.save('build/data/dump.test')
-
         with self.assertRaises(RuntimeError):
             pgdumplib.load('build/data/dump.test')
 
@@ -85,9 +68,7 @@ class EdgeTestCase(unittest.TestCase):
 
     def test_dump_id_mismatch_in_data(self):
         dmp = pgdumplib.new('test')
-        dmp.add_entry(
-            'bad', 'block_table', constants.SECTION_DATA, None,
-            constants.TABLE_DATA, dump_id=1024)
+        dmp.add_entry(constants.TABLE_DATA, '', 'block_table', dump_id=1024)
         with gzip.open(
                 pathlib.Path(dmp._temp_dir.name) / '1024.gz', 'wb') as handle:
             handle.write(b'1\t\1\t\1\n')
@@ -100,25 +81,20 @@ class EdgeTestCase(unittest.TestCase):
 
     def test_no_data(self):
         dmp = pgdumplib.new('test')
-        dmp.add_entry(
-            'bad', 'empty_table', constants.SECTION_DATA, None,
-            constants.TABLE_DATA, dump_id=5)
+        dmp.add_entry(constants.TABLE_DATA, '', 'empty_table', dump_id=5)
         with gzip.open(pathlib.Path(dmp._temp_dir.name) / '5.gz', 'wb') as h:
             h.write(b'')
         dmp.save('build/data/dump.test')
-
         dmp = pgdumplib.load('build/data/dump.test')
-        data = [line for line in dmp.table_data('bad', 'empty_table')]
+        data = [line for line in dmp.table_data('', 'empty_table')]
         self.assertEqual(len(data), 0)
 
     def test_runtime_error_when_pos_not_set(self):
         dmp = pgdumplib.new('test')
-        dmp.add_entry('public', 'table', constants.SECTION_DATA, None,
-                      constants.TABLE_DATA, dump_id=32)
+        dmp.add_entry(constants.TABLE_DATA, 'public', 'table', dump_id=32)
         with gzip.open(pathlib.Path(dmp._temp_dir.name) / '32.gz', 'wb') as h:
             h.write(b'1\t\1\t\1\n')
 
-        dmp.save('build/data/dump.test')
         with mock.patch('pgdumplib.constants.K_OFFSET_POS_SET', 9):
             dmp.save('build/data/dump.test')
 
@@ -140,3 +116,18 @@ class EdgeTestCase(unittest.TestCase):
 
         dmp = pgdumplib.load('build/data/dump.test')
         self.assertEqual(dmp.encoding, 'UTF8')
+
+    def test_invalid_desc(self):
+        dmp = pgdumplib.new('test')
+        with self.assertRaises(ValueError):
+            dmp.add_entry('foo', '', 'table')
+
+    def test_invalid_dump_id(self):
+        dmp = pgdumplib.new('test')
+        with self.assertRaises(ValueError):
+            dmp.add_entry(constants.TABLE, '', 'table', dump_id=0)
+
+    def test_used_dump_id(self):
+        dmp = pgdumplib.new('test')
+        with self.assertRaises(ValueError):
+            dmp.add_entry(constants.TABLE, '', 'table', dump_id=1)

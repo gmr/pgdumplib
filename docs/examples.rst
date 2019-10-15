@@ -17,11 +17,12 @@ from a dump:
 .. code-block:: python
 
     import pgdumplib
+    from pgdumplib import constants
 
     dump = pgdumplib.load('dump.out')
     for row in dump.table_data('public', 'table-name'):
         print(row)
-    print(dump.lookup_entry('public', 'table-name').defn)
+    print(dump.lookup_entry(constants.TABLE, 'public', 'table-name').defn)
 
 Writing
 -------
@@ -40,52 +41,44 @@ create a dump with a schema, extension, comment, type, tables, and table data:
     dump = pgdumpib.new('example')
 
     schema = dump.add_entry(
+        desc=constants.SCHEMA,
         tag='test',
-        desc='SCHEMA',
-        section=constants.SECTION_PRE_DATA,
         defn='CREATE SCHEMA test;',
         drop_stmt='DROP SCHEMA test;')
 
     dump.add_entry(
+        desc=constants.ACL,
         tag='SCHEMA test',
-        desc='ACL',
-        section=constants.SECTION_PRE_DATA,
         defn='GRANT USAGE ON SCHEMA test TO PUBLIC;',
         dependencies=[schema.dump_id])
 
     uuid_ossp = dump.add_entry(
+        desc=constants.EXTENSION,
         tag='uuid-ossp',
-        desc='EXTENSION',
-        section=constants.SECTION_PRE_DATA,
         defn='CREATE EXTENSION IF NOT EXISTS "uuid-ossp" WITH SCHEMA public;',
         drop_stmt='DROP EXTENSION "uuid-ossp";')
 
     dump.add_entry(
+        desc=constants.COMMENT,
         tag='EXTENSION "uuid-ossp"',
-        desc='COMMENT',
-        section=constants.SECTION_PRE_DATA,
-        defn="""\
-        COMMENT ON EXTENSION "uuid-ossp"
-             IS generate universally unique identifiers (UUIDs)'""",
+        defn="""COMMENT ON EXTENSION "uuid-ossp" IS generate universally unique identifiers (UUIDs)'""",
         dependencies=[uuid_ossp.dump_id])
 
     addr_type = dump.add_entry(
+        desc=constants.TYPE,
         namespace='test',
         tag='address_type',
-        section=constants.SECTION_PRE_DATA,
         owner='postgres',
-        desc='TYPE',
         defn="""\
         CREATE TYPE test.address_type AS ENUM ('billing', delivery');""",
         drop_stmt='DROP TYPE test.address_type;',
         dependencies=[schema.dump_id])
 
     test_addresses = dump.add_entry(
+        desc=constants.TABLE,
         namespace='test',
         tag='addresses',
-        section=constants.SECTION_PRE_DATA,
         owner='postgres',
-        desc='TABLE',
         defn="""\
         CREATE TABLE addresses (
             id               UUID                     NOT NULL DEFAULT uuid_generate_v4() PRIMARY KEY,
@@ -105,8 +98,8 @@ create a dump with a schema, extension, comment, type, tables, and table data:
         dependencies=[schema.dump_id, addr_type.dump_id, uuid_ossp.dump_id])
 
     example = dump.add_entry(
-        'public', 'example', constants.SECTION_PRE_DATA, 'postgres',
-        'TABLE',
+        constants.TABLE,
+        'public', 'example', 'postgres',
         'CREATE TABLE public.example (\
             id UUID NOT NULL PRIMARY KEY,\
             created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,\

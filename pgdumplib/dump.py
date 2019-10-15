@@ -38,6 +38,7 @@ import zlib
 
 import arrow
 from dateutil import tz
+import toposort
 
 from pgdumplib import constants, converters, exceptions, version
 
@@ -62,8 +63,10 @@ class Dump:
     """
     def __init__(
             self, dbname: str = 'pgdumplib', encoding: str = 'UTF8',
-            converter:
-            typing.Optional[typing.Type[converters.DataConverter]] = None):
+            converter: typing.Optional[
+                typing.Type[converters.DataConverter],
+                typing.Type[converters.NoOpConverter],
+                typing.Type[converters.SmartDataConverter]] = None):
         self.compression: bool = False
         self.dbname: str = dbname
         self.dump_version: str = VERSION_INFO
@@ -71,16 +74,14 @@ class Dump:
         self.entries: typing.List[Entry] = [
             Entry(
                 dump_id=1, tag=constants.ENCODING, desc=constants.ENCODING,
-                section=constants.SECTION_PRE_DATA,
-                defn="SET client_encoding = '{}';".format(self.encoding)),
+                defn="SET client_encoding = '{}';\n".format(self.encoding)),
             Entry(
                 dump_id=2, tag='STDSTRINGS', desc='STDSTRINGS',
-                section=constants.SECTION_PRE_DATA,
-                defn="SET standard_conforming_strings = 'on';"),
+                defn="SET standard_conforming_strings = 'on';\n"),
             Entry(
                 dump_id=3, tag='SEARCHPATH', desc='SEARCHPATH',
-                section=constants.SECTION_PRE_DATA,
-                defn="SELECT pg_catalog.set_config('search_path', '', false);")
+                defn='SELECT pg_catalog.set_config('
+                     "'search_path', '', false);\n")
         ]
         self.server_version: str = VERSION_INFO
         self.timestamp: datetime.datetime = arrow.now().datetime
@@ -103,25 +104,24 @@ class Dump:
 
     def add_entry(
             self,
-            namespace: str = '',
-            tag: str = '',
-            section: str = constants.SECTION_NONE,
-            owner: str = '',
-            desc: str = '',
-            defn: str = '',
-            drop_stmt: str = '',
-            copy_stmt: str = '',
-            dependencies: typing.List[int] = None,
-            tablespace: str = '',
+            desc: str,
+            namespace: typing.Optional[str] = '',
+            tag: typing.Optional[str] = '',
+            owner: typing.Optional[str] = '',
+            defn: typing.Optional[str] = '',
+            drop_stmt: typing.Optional[str] = '',
+            copy_stmt: typing.Optional[str] = '',
+            dependencies: typing.Optional[typing.List[int]] = None,
+            tablespace: typing.Optional[str] = '',
             dump_id: typing.Optional[int] = None) -> Entry:
         """Add an entry to the dump
 
         The ``namespace`` and ``tag`` are required.
 
-        A :py:exc:`ValueError` will be raised if section is not one of
-        :py:const:`pgdumplib.constants.SECTION_PRE_DATA`,
-        :py:const:`pgdumplib.constants.SECTION_DATA`, or
-        :py:const:`pgdumplib.constants.SECTION_POST_DATA`.
+        A :py:exc:`ValueError` will be raised if `desc` is not value that
+        is known in :py:module:`pgdumplib.constants`.
+
+        The section is
 
         When adding data, use :py:meth:`~Dump.table_data_writer` instead of
         invoking :py:meth:`~Dump.add_entry` directly.
@@ -139,11 +139,10 @@ class Dump:
 
         .. note:: The creation of ad-hoc blobs is not supported.
 
+        :param str desc: The entry description
         :param str namespace: The namespace of the entry
         :param str tag: The name/table/relation/etc of the entry
-        :param str section: The section for the entry
         :param str owner: The owner of the object in Postgres
-        :param str desc: The entry description
         :param str defn: The DDL definition for the entry
         :param drop_stmt: A drop statement used to drop the entry before
         :param copy_stmt: A copy statement used when there is a corresponding
@@ -156,23 +155,26 @@ class Dump:
         :rtype: pgdumplib.dump.Entry
 
         """
-        if section not in constants.SECTIONS:
-            raise ValueError('Invalid section: {}'.format(section))
+        if desc not in constants.SECTION_MAPPING:
+            raise ValueError('Invalid desc: {}'.format(desc))
+
+        if dump_id is not None and dump_id < 1:
+            raise ValueError('dump_id must be greater than 1')
 
         dump_ids = [e.dump_id for e in self.entries]
+
+        if dump_id and dump_id in dump_ids:
+            raise ValueError('dump_id {!r} is already assigned', dump_id)
 
         for dependency in dependencies or []:
             if dependency not in dump_ids:
                 raise ValueError(
                     'Dependency dump_id {!r} not found'.format(dependency))
 
-        if not dump_id:
-            dump_id = self._next_dump_id()
-
         self.entries.append(Entry(
-            dump_id, False, '', '', tag, desc, section, defn, drop_stmt,
-            copy_stmt, namespace, tablespace, owner, False,
-            dependencies or []))
+            dump_id or self._next_dump_id(), False, '', '', tag or '', desc,
+            defn or '', drop_stmt or '', copy_stmt or '', namespace or '',
+            tablespace or '', owner or '', False, dependencies or []))
         return self.entries[-1]
 
     def blobs(self) -> typing.Generator[typing.Tuple[int, bytes], None, None]:
@@ -220,6 +222,8 @@ class Dump:
         if not pathlib.Path(path).exists():
             raise ValueError('Path {!r} does not exist'.format(path))
 
+        LOGGER.debug('Loading dump file from %s', path)
+
         self.entries = []  # Wipe out pre-existing entries
         self._handle = open(path, 'rb')
         self._read_header()
@@ -256,11 +260,11 @@ class Dump:
                 raise RuntimeError('Unknown block type: {}'.format(block_type))
         return self
 
-    def lookup_entry(self, namespace: str, tag: str,
-                     section: str = constants.SECTION_PRE_DATA) \
+    def lookup_entry(self, desc: str, namespace: str, tag: str) \
             -> typing.Optional[Entry]:
         """Return the entry for the given namespace and tag
 
+        :param str desc: The desc / object type of the entry
         :param str namespace: The namespace of the entry
         :param str tag: The tag/relation/table name
         :param str section: The dump section the entry is for
@@ -268,9 +272,9 @@ class Dump:
         :rtype: pgdumplib.dump.Entry or None
 
         """
-        if section not in constants.SECTIONS:
-            raise ValueError('Invalid section: {}'.format(section))
-        for entry in [e for e in self.entries if e.section == section]:
+        if desc not in constants.SECTION_MAPPING:
+            raise ValueError('Invalid desc: {}'.format(desc))
+        for entry in [e for e in self.entries if e.desc == desc]:
             if entry.namespace == namespace and entry.tag == tag:
                 return entry
         return None
@@ -287,10 +291,10 @@ class Dump:
         self._handle = open(path, 'wb')
         self._save()
         self._handle.close()
-        self.load(path)
 
     def table_data(self, namespace: str, table: str) \
-            -> typing.Generator[typing.Tuple, None, None]:
+            -> typing.Generator[
+                typing.Union[str, typing.Tuple[typing.Any, ...]], None, None]:
         """Iterator that returns data for the given namespace and table
 
         :param str namespace: The namespace/schema for the table
@@ -324,7 +328,7 @@ class Dump:
             dump_id = self._next_dump_id()
             self.entries.append(Entry(
                 dump_id=dump_id, had_dumper=True, tag=entry.tag,
-                desc=constants.TABLE_DATA, section=constants.SECTION_DATA,
+                desc=constants.TABLE_DATA,
                 copy_stmt='COPY {}.{} ({}) FROM stdin;'.format(
                     entry.namespace, entry.tag, ', '.join(columns)),
                 namespace=entry.namespace, owner=entry.owner,
@@ -496,13 +500,13 @@ class Dump:
 
     def _read_entry(self) -> typing.NoReturn:
         """Read in an individual entry and append it to the entries stack"""
-        dump_id = self._read_int() or 0
+        dump_id = self._read_int()
         had_dumper = bool(self._read_int())
         table_oid = self._read_bytes().decode(self.encoding)
         oid = self._read_bytes().decode(self.encoding)
         tag = self._read_bytes().decode(self.encoding)
         desc = self._read_bytes().decode(self.encoding)
-        section = constants.SECTIONS[(self._read_int() or 2) - 1]
+        self._read_int()  # Section is mapped, no need to assign
         defn = self._read_bytes().decode(self.encoding)
         drop_stmt = self._read_bytes().decode(self.encoding)
         copy_stmt = self._read_bytes().decode(self.encoding)
@@ -514,12 +518,10 @@ class Dump:
         data_state, offset = self._read_offset()
         self.entries.append(Entry(
             dump_id=dump_id, had_dumper=had_dumper, table_oid=table_oid,
-            oid=oid, tag=tag, desc=desc, section=section, defn=defn,
-            drop_stmt=drop_stmt, copy_stmt=copy_stmt, namespace=namespace,
-            tablespace=tablespace, owner=owner, with_oids=with_oids,
-            dependencies=dependencies, data_state=data_state or 0,
-            offset=offset or 0))
-        return None
+            oid=oid, tag=tag, desc=desc, defn=defn, drop_stmt=drop_stmt,
+            copy_stmt=copy_stmt, namespace=namespace, tablespace=tablespace,
+            owner=owner, with_oids=with_oids, dependencies=dependencies,
+            data_state=data_state or 0, offset=offset or 0))
 
     def _read_header(self) -> typing.NoReturn:
         """Read in the dump header
@@ -529,7 +531,6 @@ class Dump:
         """
         if self._handle.read(5) != constants.MAGIC:
             raise ValueError('Invalid archive header')
-
         self._vmaj = struct.unpack('B', self._handle.read(1))[0]
         self._vmin = struct.unpack('B', self._handle.read(1))[0]
         self._vrev = struct.unpack('B', self._handle.read(1))[0]
@@ -601,11 +602,11 @@ class Dump:
 
     def _save(self) -> typing.NoReturn:
         """Save the dump file to disk"""
-        self.entries.sort(
-            key=lambda e: (constants.SECTION_SORT[e.section], e.dump_id))
         self._write_toc()
-        self._write_data()
-        self._write_toc()
+        self._write_entries()
+        if self._write_data():
+            self._write_toc()  # Overwrite ToC and entries
+            self._write_entries()
 
     def _set_encoding(self) -> typing.NoReturn:
         """If the encoding is found in the dump entries, set the encoding
@@ -668,27 +669,61 @@ class Dump:
         """
         self._handle.write(struct.pack('B', value))
 
-    def _write_data(self) -> typing.NoReturn:
-        """Write the data blocks"""
+    def _write_data(self) -> set:
+        """Write the data blocks, returning a set of IDs that were written"""
+        saved = set({})
         for offset, entry in enumerate(self.entries):
             if entry.section != constants.SECTION_DATA:
                 continue
             self.entries[offset].offset = self._handle.tell()
+            size = 0
             if entry.desc == constants.TABLE_DATA:
                 size = self._write_table_data(entry.dump_id)
+                saved.add(entry.dump_id)
             elif entry.desc == constants.BLOBS:
                 size = self._write_blobs(entry.dump_id)
-            else:
-                raise ValueError('Unknown block type: {}'.format(entry.desc))
+                saved.add(entry.dump_id)
             if size:
                 self.entries[offset].data_state = constants.K_OFFSET_POS_SET
+        return saved
 
-    def _write_entries(self) -> typing.NoReturn:
-        """Write the toc entries"""
-        LOGGER.debug('Writing %i entries', len(self.entries))
+    def _write_entries(self):
         self._write_int(len(self.entries))
-        for entry in self.entries:
+        saved = set({})
+
+        # Always add these entries first
+        for entry in self.entries[0:3]:
             self._write_entry(entry)
+            saved.add(entry.dump_id)
+
+        saved = self._write_section(
+            constants.SECTION_PRE_DATA, [
+                constants.SCHEMA,
+                constants.EXTENSION,
+                constants.AGGREGATE,
+                constants.OPERATOR,
+                constants.OPERATOR_CLASS,
+                constants.CAST,
+                constants.COLLATION,
+                constants.CONVERSION,
+                constants.PROCEDURAL_LANGUAGE,
+                constants.FOREIGN_DATA_WRAPPER,
+                constants.FOREIGN_SERVER,
+                constants.SERVER,
+                constants.DOMAIN,
+                constants.TYPE,
+                constants.SHELL_TYPE], saved)
+
+        saved = self._write_section(constants.SECTION_DATA, [], saved)
+
+        saved = self._write_section(
+            constants.SECTION_POST_DATA, [
+                constants.CHECK_CONSTRAINT,
+                constants.CONSTRAINT,
+                constants.INDEX], saved)
+
+        saved = self._write_section(constants.SECTION_NONE, [], saved)
+        LOGGER.debug('Wrote %i of %i entries', len(saved), len(self.entries))
 
     def _write_entry(self, entry: Entry) -> typing.NoReturn:
         """Write the entry
@@ -696,6 +731,7 @@ class Dump:
         :param pgdumplib.dump.Entry entry: The entry to write
 
         """
+        LOGGER.debug('Writing %r', entry)
         self._write_int(entry.dump_id)
         self._write_int(int(entry.had_dumper))
         self._write_str(entry.table_oid or '0')
@@ -749,6 +785,19 @@ class Dump:
         for offset in range(0, self._offsize):
             self._write_byte(value & 0xFF)
             value >>= 8
+
+    def _write_section(self, section: str, obj_types: list, saved: set) -> set:
+        for obj_type in obj_types:
+            for entry in [e for e in self.entries if e.desc == obj_type]:
+                self._write_entry(entry)
+                saved.add(entry.dump_id)
+        for dump_id in toposort.toposort_flatten(
+                {e.dump_id: set(e.dependencies) for e in self.entries
+                 if e.section == section}, True):
+            if dump_id not in saved:
+                self._write_entry(self.get_entry(dump_id))
+                saved.add(dump_id)
+        return saved
 
     def _write_str(self, value: str) -> typing.NoReturn:
         """Write a string
@@ -813,10 +862,9 @@ class Dump:
         self._write_str(self.dbname)
         self._write_str(self.server_version)
         self._write_str(self.dump_version)
-        self._write_entries()
 
 
-@dataclasses.dataclass
+@dataclasses.dataclass(eq=True)
 class Entry:
     """The entry model represents a single entry in the dataclass
 
@@ -832,7 +880,6 @@ class Entry:
     :var str oid: The OID of the object the entry represents
     :var str tag: The name/table/relation/etc of the entry
     :var str desc: The entry description
-    :var str section: The section for the entry
     :var str defn: The DDL definition for the entry
     :var str drop_stmt: A drop statement used to drop the entry before
     :var str copy_stmt: A copy statement used when there is a corresponding
@@ -845,6 +892,7 @@ class Entry:
         is dependent upon.
     :var int data_state: Indicates if the entry has data and how it is stored
     :var int offset: If the entry has data, the offset to the data in the file
+    :var str section: The section of the dump file the entry belongs to
 
     """
     dump_id: int
@@ -853,7 +901,6 @@ class Entry:
     oid: str = ''
     tag: str = ''
     desc: str = ''
-    section: str = constants.SECTIONS[0]
     defn: str = ''
     drop_stmt: str = ''
     copy_stmt: str = ''
@@ -864,6 +911,11 @@ class Entry:
     dependencies: typing.List[int] = dataclasses.field(default_factory=list)
     data_state: int = constants.K_OFFSET_NO_DATA
     offset: int = 0
+
+    @property
+    def section(self) -> str:
+        """Return the section the entry belongs to"""
+        return constants.SECTION_MAPPING[self.desc]
 
 
 class TableData:

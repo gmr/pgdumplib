@@ -57,8 +57,8 @@ class TestCase(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls) -> None:
-        cls.dump = pgdumplib.load(
-            pathlib.Path('build') / 'data' / cls.PATH, cls.CONVERTER)
+        cls.dump_path = pathlib.Path('build') / 'data' / cls.PATH
+        cls.dump = dump.Dump(converter=cls.CONVERTER).load(cls.dump_path)
 
     def test_table_data(self):
         data = []
@@ -78,20 +78,23 @@ class TestCase(unittest.TestCase):
                 LOGGER.debug('Line: %r', line)
 
     def test_lookup_entry(self):
-        entry = self.dump.lookup_entry('public', 'pgbench_accounts')
+        entry = self.dump.lookup_entry(
+            constants.TABLE, 'public', 'pgbench_accounts')
         self.assertEqual(entry.namespace, 'public')
         self.assertEqual(entry.tag, 'pgbench_accounts')
         self.assertEqual(entry.section, constants.SECTION_PRE_DATA)
 
     def test_lookup_entry_not_found(self):
-        self.assertIsNone(self.dump.lookup_entry('public', 'foo'))
+        self.assertIsNone(
+            self.dump.lookup_entry(constants.TABLE, 'public', 'foo'))
 
-    def test_lookup_entry_invalid_section(self):
+    def test_lookup_entry_invalid_desc(self):
         with self.assertRaises(ValueError):
-            self.dump.lookup_entry('public', 'pgbench_accounts', 'BAD SECTION')
+            self.dump.lookup_entry('foo', 'public', 'pgbench_accounts')
 
     def test_get_entry(self):
-        entry = self.dump.lookup_entry('public', 'pgbench_accounts')
+        entry = self.dump.lookup_entry(
+            constants.TABLE, 'public', 'pgbench_accounts')
         self.assertEqual(self.dump.get_entry(entry.dump_id), entry)
 
     def test_get_entry_not_found(self):
@@ -105,8 +108,7 @@ class TestCase(unittest.TestCase):
         expectation = cursor.fetchone()[0]
         conn.close()
 
-        dmp = pgdumplib.load(
-            pathlib.Path('build') / 'data' / self.PATH, self.CONVERTER)
+        dmp = pgdumplib.load(self.dump_path, self.CONVERTER)
         blobs = []
         for oid, blob in dmp.blobs():
             self.assertIsInstance(oid, int)

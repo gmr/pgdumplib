@@ -14,8 +14,8 @@ from pgdumplib import constants, converters, dump
 class SavedDumpTestCase(unittest.TestCase):
 
     def setUp(self):
-        dump = pgdumplib.load('build/data/dump.compressed')
-        dump.save('build/data/dump.test')
+        dmp = pgdumplib.load('build/data/dump.compressed')
+        dmp.save('build/data/dump.test')
         self.original = pgdumplib.load('build/data/dump.compressed')
         self.saved = pgdumplib.load('build/data/dump.test')
 
@@ -86,36 +86,36 @@ class EmptyDumpTestCase(unittest.TestCase):
 
 class CreateDumpTestCase(unittest.TestCase):
 
-    def tearClass(self) -> None:
+    def tearDown(self) -> None:
         test_file = pathlib.Path('build/data/dump.test')
         if test_file.exists():
             test_file.unlink()
 
-    def test_dump_exepctations(self):
+    def test_dump_expectations(self):
         dump = pgdumplib.new('test', 'UTF8')
-        entry = dump.add_entry(
-            None, 'postgres', constants.SECTION_PRE_DATA, 'postgres',
-            'DATABASE',
-            """\
+        database = dump.add_entry(
+            desc=constants.DATABASE,
+            tag='postgres',
+            owner='postgres',
+            defn="""\
             CREATE DATABASE postgres
               WITH TEMPLATE = template0
                    ENCODING = 'UTF8'
                    LC_COLLATE = 'en_US.utf8'
                    LC_CTYPE = 'en_US.utf8';""",
-            'DROP DATABASE postgres',
-            dump_id=1024)
+            drop_stmt='DROP DATABASE postgres')
 
         dump.add_entry(
-            None, 'DATABASE postgres', constants.SECTION_PRE_DATA,
-            'postgres', 'COMMENT',
-            """\
+            constants.COMMENT,
+            tag='DATABASE postgres',
+            owner='postgres',
+            defn="""\
             COMMENT ON DATABASE postgres
                  IS 'default administrative connection database';""",
-            dependencies=[entry.dump_id])
+            dependencies=[database.dump_id])
 
         example = dump.add_entry(
-            'public', 'example', constants.SECTION_PRE_DATA, 'postgres',
-            'TABLE',
+            constants.TABLE, 'public', 'example', 'postgres',
             'CREATE TABLE public.example (\
               id UUID NOT NULL PRIMARY KEY, \
               created_at TIMESTAMP WITH TIME ZONE, \
@@ -151,7 +151,7 @@ class CreateDumpTestCase(unittest.TestCase):
         self.assertTrue(test_file.exists())
 
         dump = pgdumplib.load(test_file, converters.SmartDataConverter)
-        entry = dump.get_entry(1024)
+        entry = dump.get_entry(database.dump_id)
         self.assertEqual(entry.desc, 'DATABASE')
         self.assertEqual(entry.owner, 'postgres')
         self.assertEqual(entry.tag, 'postgres')

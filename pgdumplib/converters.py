@@ -34,14 +34,14 @@ class DataConverter:
 
     """
     @staticmethod
-    def convert(row: str) -> typing.Tuple[typing.Union[str, None], ...]:
+    def convert(row: str) -> typing.Tuple[typing.Optional[str], ...]:
         """Convert the string based row into a tuple of columns.
 
         :param str row: The row to convert
         :rtype: tuple
 
         """
-        return tuple(None if e == '\\N' else e for e in row.split('\t'))
+        return tuple(None if e == '\\N' else str(e) for e in row.split('\t'))
 
 
 class NoOpConverter:
@@ -58,10 +58,16 @@ class NoOpConverter:
 
 
 SmartColumn = typing.Union[
-    None, str, int, decimal.Decimal,
-    ipaddress.IPv4Network, ipaddress.IPv4Address,
-    ipaddress.IPv6Network, ipaddress.IPv6Address,
-    uuid.UUID, datetime.datetime]
+    None,
+    str,
+    int,
+    datetime.datetime,
+    decimal.Decimal,
+    ipaddress.IPv4Address,
+    ipaddress.IPv4Network,
+    ipaddress.IPv6Address,
+    ipaddress.IPv6Network,
+    uuid.UUID]
 
 
 class SmartDataConverter(DataConverter):
@@ -84,24 +90,13 @@ class SmartDataConverter(DataConverter):
         - :py:class:`uuid.UUID`
 
     """
-    def convert(self, row: str) \
-            -> typing.Tuple[SmartColumn, ...]:
-        """Convert the string based row into a tuple of columns.
-
-        :param str row: The row to convert
-        :rtype: tuple
-
-        """
+    def convert(self, row: str) -> typing.Tuple[SmartColumn, ...]:
+        """Convert the string based row into a tuple of columns"""
         return tuple(self._convert_column(c) for c in row.split('\t'))
 
     @staticmethod
     def _convert_column(column: str) -> SmartColumn:
-        """Attempt to convert the column from a string if appropriate
-
-        :param str column: The column to attempt to convert
-        :rtype: mixed
-
-        """
+        """Attempt to convert the column from a string if appropriate"""
         if column == '\\N':
             return None
         if column.strip('-').isnumeric():
