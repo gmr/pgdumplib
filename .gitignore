@@ -3,6 +3,7 @@
 *.pyc
 *.pyo
 .coverage
+.mypy_cache
 .idea
 .vscode
 build/
