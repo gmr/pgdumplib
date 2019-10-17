@@ -26,7 +26,7 @@ jobs:
       - name: Install library dependencies
         run: python setup.py develop
 
-      - name: Run bootstrap to start required containers
+      - name: Bootstrap test environment
         run: ./bootstrap
 
       - name: Run flake8 tests
