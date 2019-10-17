@@ -1,0 +1,36 @@
+name: Testing
+on:
+  push:
+    paths-ignore:
+      - 'docs/**'
+      - 'setup.*'
+      - '*.md'
+      - '*.rst'
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python: [3.7, 3.8]
+    container: python:${{ matrix.python }}-alpine
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v1
+
+      - name: Setup environment
+        run: apk --update add gcc libpq make musl-dev postgresql-dev linux-headers
+
+      - name: Install testing dependencies
+        run: pip3 install -r requires/testing.txt
+
+      - name: Install library dependencies
+        run: python setup.py develop
+
+      - name: Run bootstrap to start required containers
+        run: ./bootstrap
+
+      - name: Run flake8 tests
+        run: flake8 --output build/flake8.txt --tee
+
+      - name: Run tests
+        run: nosetests
