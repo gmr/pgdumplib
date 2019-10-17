@@ -19,7 +19,7 @@ import ipaddress
 import typing
 import uuid
 
-from pgdumplib import constants
+import pendulum
 
 
 class DataConverter:
@@ -117,9 +117,10 @@ class SmartDataConverter(DataConverter):
             return uuid.UUID(column)
         except ValueError:
             pass
-        try:
-            return datetime.datetime.strptime(
-                column, constants.PGDUMP_STRFTIME_FMT)
-        except ValueError:
-            pass
+        for tz_fmt in {'Z', 'ZZ', 'z', 'zz'}:
+            try:
+                return pendulum.from_format(
+                    column, 'YYYY-MM-DD HH:mm:ss {}'.format(tz_fmt))
+            except ValueError:
+                pass
         return column
