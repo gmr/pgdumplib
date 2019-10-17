@@ -7,7 +7,7 @@ on:
       - 'setup.*'
       - '*.md'
       - '*.rst'
-    tags-ignore:["*"]
+    tags-ignore: ["*"]
 jobs:
   test:
     runs-on: ubuntu-latest
