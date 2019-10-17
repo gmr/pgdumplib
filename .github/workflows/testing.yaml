@@ -1,13 +1,13 @@
 name: Testing
 on:
   push:
+    branches: ["*"]
     paths-ignore:
       - 'docs/**'
       - 'setup.*'
       - '*.md'
       - '*.rst'
-    tags-ignore:
-      - '*'
+    tags-ignore:["*"]
 jobs:
   test:
     runs-on: ubuntu-latest
