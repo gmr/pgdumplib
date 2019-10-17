@@ -24,7 +24,8 @@ jobs:
         python: [3.7, 3.8]
     container:
       image: python:${{ matrix.python }}-alpine
-      env: POSTGRES_URI=postgresql://postgres@postgres:5432/postgres
+      env:
+        POSTGRES_URI: postgresql://postgres@postgres:5432/postgres
     steps:
       - name: Checkout repository
         uses: actions/checkout@v1
