@@ -1,5 +1,7 @@
 #!/usr/bin/env sh
 mkdir -p build/data
+cp /usr/share/zoneinfo/America/New_York /etc/localtime
+echo "America/New_York" > /etc/timezone
 if test -f "build/data/dump.not-compressed"; then
   echo "Test data already exists"
 else
