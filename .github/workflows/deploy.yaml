@@ -1,10 +1,8 @@
 name: Deployment
-on:
-  push:
-    tags:
-      - *
+on: [push]
 jobs:
   deploy:
+    if: github.event_name == 'push' && startsWith(github.event.ref, 'refs/tags')
     container: python:3.8-alpine
     steps:
       - name: Checkout repository
@@ -12,7 +10,6 @@ jobs:
       - name: Build package
         run: python3 setup.py sdist
       - name: Publish package
-        if: github.event_name == 'push' && startsWith(github.event.ref, 'refs/tags')
         uses: pypa/gh-action-pypi-publish@master
         with:
           user: __token__
