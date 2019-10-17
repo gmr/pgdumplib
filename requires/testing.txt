@@ -8,7 +8,6 @@ flake8-import-order
 flake8-print
 flake8-quotes
 flake8-rst-docstrings
-flake8-sql
 flake8-tuple
 nose
 psycopg2
