@@ -1,4 +1,5 @@
 #!/usr/bin/env sh
+mkdir -p build/data
 if test -f "build/data/dump.not-compressed"; then
   echo "Test data already exists"
 else
@@ -11,3 +12,8 @@ else
   pg_dump -Fc -h postgres -U postgres -f build/data/dump.data-only -d postgres --compress=0 -a
   pg_dump -Fc -h postgres -U postgres -f build/data/dump.inserts -d postgres --compress=0 --inserts
 fi
+cat > build/test-environment<<EOF
+export PGDATABASE=postgres
+export PGUSER=postgres
+export POSTGRES_URI=postgresql://postgres@postgres:5432/postgres
+EOF
