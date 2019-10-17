@@ -16,10 +16,21 @@
 
 ## 1.0.0 - 2019-06-14
 
-- Initial beta release
+- Full read/write support of custom formatted pg_dump files
+- Refactored API
+
+## 0.2.1 - 2019-01-15
+
+- Documentation and docstring updates
+
+## 0.2.0 - 2019-01-15
+
+-  Make the dump ID value part of the entry
+
+## 0.1.1 - 2019-01-15
+
+- Distribution Fixes
 
 ## 0.1.0 - 2018-11-06
 
 - Initial alpha release
-
-
