@@ -11,8 +11,6 @@ import unittest
 from unittest import mock
 import uuid
 
-import arrow
-from dateutil import tz
 import psycopg2
 
 import pgdumplib
@@ -228,9 +226,6 @@ class RestoreComparisonTestCase(unittest.TestCase):
                 data[key] = match[0] != '0'
             elif key == 'entry_count':
                 data[key] = int(match[0])
-            elif key == 'timestamp':
-                data[key] = arrow.get(
-                    match[0]).replace(tzinfo=tz.tzlocal()).datetime
             else:
                 data[key] = match[0]
         return DumpInfo(**data)
