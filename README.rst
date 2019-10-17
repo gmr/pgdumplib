@@ -3,7 +3,7 @@ pgdumplib
 
 Python3 library for reading and writing pg_dump files using the custom format.
 
-|Version| |Status| |Coverage| |License| |Docs|
+|Version| |Coverage| |License| |Docs|
 
 Installation
 ------------
@@ -39,10 +39,6 @@ iterate through the data of one of the tables.
 .. |Version| image:: https://img.shields.io/pypi/v/pgdumplib.svg?
    :target: https://pypi.python.org/pypi/pgdumplib
    :alt: Package Version
-
-.. |Status| image:: https://img.shields.io/circleci/build/gh/gmr/pgdumplib/master.svg?token=46593b052a2e0ff4720cfa2fc52bd6ef738ec989
-   :target: https://circleci.com/gh/gmr/pgdumplib/tree/master
-   :alt: Build Status
 
 .. |Coverage| image:: https://codecov.io/gh/gmr/pgdumplib/branch/master/graph/badge.svg
    :target: https://codecov.io/github/gmr/pgdumplib?branch=master
