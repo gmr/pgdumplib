@@ -2,6 +2,7 @@ name: Deployment
 on: [push]
 jobs:
   deploy:
+    runs-on: ubuntu-latest
     if: github.event_name == 'push' && startsWith(github.event.ref, 'refs/tags')
     container: python:3.8-alpine
     steps:
