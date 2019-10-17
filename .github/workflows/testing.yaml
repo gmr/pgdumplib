@@ -6,6 +6,8 @@ on:
       - 'setup.*'
       - '*.md'
       - '*.rst'
+    tags-ignore:
+      - '*'
 jobs:
   test:
     runs-on: ubuntu-latest
