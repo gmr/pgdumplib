@@ -219,11 +219,9 @@ class RestoreComparisonTestCase(unittest.TestCase):
             ['pg_restore', '-l', str(remote_path)],
             check=True, capture_output=True)
         stdout = restore.stdout.decode('utf-8')
-        print(stdout)
         data = {}
         for key, pattern in PATTERNS.items():
             match = pattern.findall(stdout)
-            print(key, match)
             if not match:
                 LOGGER.warning('No match for %s', key)
             elif key == 'compression':
