@@ -119,7 +119,7 @@ class SmartDataConverter(DataConverter):
         except ValueError:
             pass
         try:
-            return arrow.get(column).datetime
+            return arrow.get(column, 'YYYY-MM-DD HH:mm:ss ZZZ').datetime
         except (ValueError, parser.ParserError):
             pass
         return column

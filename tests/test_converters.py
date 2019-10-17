@@ -34,6 +34,15 @@ class TestCase(unittest.TestCase):
         self.assertEqual(converter.convert(value), value)
 
     def test_smart_data_converter(self):
+
+        def convert(value):
+            """Convert the value to the proper string type"""
+            if value is None:
+                return '\\N'
+            elif isinstance(value, datetime.datetime):
+                return value.strftime(constants.PGDUMP_STRFTIME_FMT)
+            return str(value)
+
         fake = faker.Faker()
         data = []
         for row in range(0, 10):
@@ -45,17 +54,10 @@ class TestCase(unittest.TestCase):
                 ipaddress.IPv4Network(fake.ipv4(True)),
                 ipaddress.IPv4Address(fake.ipv4()),
                 ipaddress.IPv6Address(fake.ipv6()),
-                arrow.get(arrow.now().to('America/Los_Angeles').strftime(
-                    constants.PGDUMP_STRFTIME_FMT)).datetime
+                arrow.get(
+                    datetime.datetime.utcnow().strftime(
+                        constants.PGDUMP_STRFTIME_FMT)).datetime
             ])
-
-        def convert(value):
-            """Convert the value to the proper string type"""
-            if value is None:
-                return '\\N'
-            elif isinstance(value, datetime.datetime):
-                return value.strftime(constants.PGDUMP_STRFTIME_FMT)
-            return str(value)
 
         converter = converters.SmartDataConverter()
         for offset, expectation in enumerate(data):
