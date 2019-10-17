@@ -36,7 +36,6 @@ import tempfile
 import typing
 import zlib
 
-import arrow
 from dateutil import tz
 import toposort
 
@@ -84,7 +83,7 @@ class Dump:
                      "'search_path', '', false);\n")
         ]
         self.server_version: str = VERSION_INFO
-        self.timestamp: datetime.datetime = arrow.now().datetime
+        self.timestamp: datetime.datetime = datetime.datetime.now(tz.tzlocal())
 
         converter = converter or converters.DataConverter
         self._converter: converters.DataConverter = converter()
@@ -597,8 +596,8 @@ class Dump:
             self._read_int(), (self._read_int() or 0) + 1,
             (self._read_int() or 0) + 1900)
         self._read_int()  # DST flag
-        return arrow.Arrow(
-            year, month, day, hour, minute, second, 0, tz.tzlocal()).datetime
+        return datetime.datetime(
+            year, month, day, hour, minute, second, 0, tz.tzlocal())
 
     def _save(self) -> typing.NoReturn:
         """Save the dump file to disk"""

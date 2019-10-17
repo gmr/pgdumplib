@@ -19,8 +19,7 @@ import ipaddress
 import typing
 import uuid
 
-import arrow
-from arrow import parser
+from pgdumplib import constants
 
 
 class DataConverter:
@@ -119,7 +118,8 @@ class SmartDataConverter(DataConverter):
         except ValueError:
             pass
         try:
-            return arrow.get(column, 'YYYY-MM-DD HH:mm:ss ZZZ').datetime
-        except (ValueError, parser.ParserError):
+            return datetime.datetime.strptime(
+                column, constants.PGDUMP_STRFTIME_FMT)
+        except ValueError:
             pass
         return column

@@ -3,8 +3,8 @@ import ipaddress
 import unittest
 import uuid
 
-import arrow
 import faker
+import maya
 
 from pgdumplib import constants, converters
 
@@ -54,9 +54,9 @@ class TestCase(unittest.TestCase):
                 ipaddress.IPv4Network(fake.ipv4(True)),
                 ipaddress.IPv4Address(fake.ipv4()),
                 ipaddress.IPv6Address(fake.ipv6()),
-                arrow.get(
-                    datetime.datetime.utcnow().strftime(
-                        constants.PGDUMP_STRFTIME_FMT)).datetime
+                maya.now().datetime(
+                    to_timezone='US/Eastern', naive=True).strftime(
+                        constants.PGDUMP_STRFTIME_FMT)
             ])
 
         converter = converters.SmartDataConverter()

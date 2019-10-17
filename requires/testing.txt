@@ -9,5 +9,6 @@ flake8-print
 flake8-quotes
 flake8-rst-docstrings
 flake8-tuple
+maya
 nose
 psycopg2
