@@ -216,8 +216,7 @@ class RestoreComparisonTestCase(unittest.TestCase):
     @classmethod
     def _read_dump_info(cls, remote_path) -> DumpInfo:
         restore = subprocess.run(
-            ['docker-compose', 'exec', 'postgres',
-             'pg_restore', '-l', str(remote_path)],
+            ['pg_restore', '-l', str(remote_path)],
             capture_output=True)
         assert restore.returncode == 0
         stdout = restore.stdout.decode('utf-8')
