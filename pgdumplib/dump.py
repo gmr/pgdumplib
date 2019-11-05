@@ -29,6 +29,7 @@ import datetime
 import gzip
 import io
 import logging
+import os
 import pathlib
 import re
 import struct
@@ -209,10 +210,11 @@ class Dump:
                 return entry
         return None
 
-    def load(self, path: str) -> Dump:
+    def load(self, path: os.PathLike) -> Dump:
         """Load the Dumpfile, including extracting all data into a temporary
         directory
 
+        :param os.PathLike path: The path of the dump to load
         :raises: :py:exc:`RuntimeError`
         :raises: :py:exc:`ValueError`
 
@@ -277,10 +279,10 @@ class Dump:
                 return entry
         return None
 
-    def save(self, path: str) -> typing.NoReturn:
+    def save(self, path: os.PathLike) -> typing.NoReturn:
         """Save the Dump file to the specified path
 
-        :param str path: The path to save the dump to
+        :param os.PathLike path: The path to save the dump to
 
         """
         if getattr(self, '_handle', None) and not self._handle.closed:

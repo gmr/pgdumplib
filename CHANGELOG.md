@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.0.1 - 2019-11-05
+
+- Minor typing and docstring updates
+
+
 ## 2.0.0 - 2019-10-15
 
 - Add mapping of `desc`/object type to dump section in `pgdumplib.constants`

@@ -5,13 +5,13 @@ instance from a :command:`pg_dump` file created in the `custom` format.
 See the :doc:`examples` page to see how to read a dump or create one.
 
 """
-version = '2.0.0'
+version = '2.0.1'
 
 
-def load(filepath: str, converter=None):
+def load(filepath, converter=None):
     """Load a pg_dump file created with -Fd from disk
 
-    :param str filepath: The path to the dump to load
+    :param os.PathLike filepath: The path to the dump to load
     :param class converter: The data converter class to use
         (Default: :py:class:`pgdumplib.converters.DataConverter`)
     :type converter: pgdumplib.converters.DataConverter or None
