@@ -36,22 +36,22 @@ iterate through the data of one of the tables.
     for line in dump.table_data('public', 'pgbench_accounts'):
         print(line)
 
-.. |Version| image:: https://img.shields.io/pypi/v/pgdumplib.svg?
+.. |Version| image:: https://img.shields.io/pypi/v/pgdumplib.svg
    :target: https://pypi.python.org/pypi/pgdumplib
    :alt: Package Version
 
-.. |Status| image:: https://github.com/gmr/pgdumplib/workflows/Testing/badge.svg?
-   :target: https://codecov.io/github/gmr/pgdumplib?branch=master
+.. |Status| image:: https://github.com/gmr/pgdumplib/workflows/Testing/badge.svg
+   :target: https://github.com/gmr/pgdumplib/actions
    :alt: Build Status
 
 .. |Coverage| image:: https://codecov.io/gh/gmr/pgdumplib/branch/master/graph/badge.svg
    :target: https://codecov.io/github/gmr/pgdumplib?branch=master
    :alt: Code Coverage
 
-.. |License| image:: https://img.shields.io/pypi/l/pgdumplib.svg?
+.. |License| image:: https://img.shields.io/pypi/l/pgdumplib.svg
    :target: https://github.com/gmr/pgdumplib/blob/master/LICENSE
    :alt: BSD
 
-.. |Docs| image:: https://img.shields.io/readthedocs/pgdumplib.svg?
+.. |Docs| image:: https://img.shields.io/readthedocs/pgdumplib.svg
    :target: https://pgdumplib.readthedocs.io/
    :alt: Documentation Status
