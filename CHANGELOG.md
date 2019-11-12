@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.1.0 - 2019-11-12
+
+- Add TABLESPACE to supported objects when adding an entry
+
 ## 2.0.1 - 2019-11-05
 
 - Minor typing and docstring updates

@@ -6,7 +6,7 @@ unless you are hacking on the library itself.
 """
 import typing
 
-APPEAR_AS: str = '11.5'
+APPEAR_AS: str = '12.0'
 """Version of PostgreSQL to appear as"""
 
 BLK_DATA: bytes = b'\x01'
@@ -129,6 +129,7 @@ STDSTRINGS: str = 'STDSTRINGS'
 SUBSCRIPTION: str = 'SUBSCRIPTION'
 TABLE: str = 'TABLE'
 TABLE_DATA: str = 'TABLE DATA'
+TABLESPACE: str = 'TABLESPACE'
 TEXT_SEARCH_DICTIONARY: str = 'TEXT SEARCH DICTIONARY'
 TEXT_SEARCH_CONFIGURATION: str = 'TEXT SEARCH CONFIGURATION'
 TEXT_SEARCH_PARSER: str = 'TEXT SEARCH PARSER'
@@ -194,6 +195,7 @@ SECTION_MAPPING: typing.Dict[str, str] = {
     STATISTICS: SECTION_POST_DATA,
     STDSTRINGS: SECTION_PRE_DATA,
     SUBSCRIPTION: SECTION_PRE_DATA,
+    TABLESPACE: SECTION_PRE_DATA,  # Not part of a postgres created pg_dump
     TABLE: SECTION_PRE_DATA,
     TABLE_DATA: SECTION_DATA,
     TRANSFORM: SECTION_PRE_DATA,
