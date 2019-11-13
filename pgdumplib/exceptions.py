@@ -20,6 +20,7 @@ class EntityNotFoundError(PgDumpLibException):
     and ``table`` specified were not found.
 
     """
+
     def __init__(self, namespace: str, table: str):
         super().__init__()
         self.namespace = namespace
