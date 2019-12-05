@@ -5,7 +5,7 @@ instance from a :command:`pg_dump` file created in the `custom` format.
 See the :doc:`examples` page to see how to read a dump or create one.
 
 """
-version = '2.1.0'
+version = '3.0.0'
 
 
 def load(filepath, converter=None):
