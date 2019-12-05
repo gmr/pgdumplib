@@ -10,4 +10,6 @@ flake8-rst-docstrings
 flake8-tuple
 maya
 nose
+pendulum
 psycopg2
+toposort

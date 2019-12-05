@@ -92,9 +92,9 @@ class Dump:
         self._intsize: int = 4
         self._offsize: int = 8
         self._temp_dir = tempfile.TemporaryDirectory()
-        self._vmaj: int = constants.MIN_VER[0]
-        self._vmin: int = constants.MIN_VER[1]
-        self._vrev: int = constants.MIN_VER[2]
+        self._vmaj: int = constants.VERSION[0]
+        self._vmin: int = constants.VERSION[1]
+        self._vrev: int = constants.VERSION[2]
         self._writers: typing.Dict[int, TableData] = {}
 
     def __repr__(self) -> str:
@@ -112,6 +112,7 @@ class Dump:
             copy_stmt: typing.Optional[str] = '',
             dependencies: typing.Optional[typing.List[int]] = None,
             tablespace: typing.Optional[str] = '',
+            tableam: typing.Optional[str] = '',
             dump_id: typing.Optional[int] = None) -> Entry:
         """Add an entry to the dump
 
@@ -149,6 +150,7 @@ class Dump:
         :param list dependencies: A list of dump_ids of objects that the entry
             is dependent upon.
         :param str tablespace: The tablespace to use
+        :param str tableam: The table access method
         :param int dump_id: The dump id, will be auto-calculated if left empty
         :raises: :py:exc:`ValueError`
         :rtype: pgdumplib.dump.Entry
@@ -169,11 +171,11 @@ class Dump:
             if dependency not in dump_ids:
                 raise ValueError(
                     'Dependency dump_id {!r} not found'.format(dependency))
-
         self.entries.append(Entry(
             dump_id or self._next_dump_id(), False, '', '', tag or '', desc,
             defn or '', drop_stmt or '', copy_stmt or '', namespace or '',
-            tablespace or '', owner or '', False, dependencies or []))
+            tablespace or '', tableam or '', owner or '', False,
+            dependencies or []))
         return self.entries[-1]
 
     def blobs(self) -> typing.Generator[typing.Tuple[int, bytes], None, None]:
@@ -491,7 +493,7 @@ class Dump:
             if not value:
                 break
             values.add(int(value))
-        return sorted(list(values))
+        return sorted(values)
 
     def _read_entries(self) -> typing.NoReturn:
         """Read in all of the entries"""
@@ -512,6 +514,10 @@ class Dump:
         copy_stmt = self._read_bytes().decode(self.encoding)
         namespace = self._read_bytes().decode(self.encoding)
         tablespace = self._read_bytes().decode(self.encoding)
+        if self.version >= (1, 14, 0):
+            tableam = self._read_bytes().decode(self.encoding)
+        else:
+            tableam = ''
         owner = self._read_bytes().decode(self.encoding)
         with_oids = self._read_bytes() == b'true'
         dependencies = self._read_dependencies()
@@ -520,8 +526,9 @@ class Dump:
             dump_id=dump_id, had_dumper=had_dumper, table_oid=table_oid,
             oid=oid, tag=tag, desc=desc, defn=defn, drop_stmt=drop_stmt,
             copy_stmt=copy_stmt, namespace=namespace, tablespace=tablespace,
-            owner=owner, with_oids=with_oids, dependencies=dependencies,
-            data_state=data_state or 0, offset=offset or 0))
+            tableam=tableam, owner=owner, with_oids=with_oids,
+            dependencies=dependencies, data_state=data_state or 0,
+            offset=offset or 0))
 
     def _read_header(self) -> typing.NoReturn:
         """Read in the dump header
@@ -538,6 +545,8 @@ class Dump:
         self._offsize = struct.unpack('B', self._handle.read(1))[0]
         self._format = constants.FORMATS[struct.unpack(
             'B', self._handle.read(1))[0]]
+        LOGGER.debug('Archive version %i.%i.%i',
+                     self._vmaj, self._vmin, self._vrev)
 
     def _read_int(self) -> typing.Optional[int]:
         """Read in a signed integer
@@ -743,6 +752,8 @@ class Dump:
         self._write_str(entry.copy_stmt)
         self._write_str(entry.namespace)
         self._write_str(entry.tablespace)
+        if self.version >= (1, 14, 0):
+            self._write_str(entry.tableam)
         self._write_str(entry.owner)
         self._write_str('true' if entry.with_oids else 'false')
         for dependency in entry.dependencies or []:
@@ -752,6 +763,8 @@ class Dump:
 
     def _write_header(self) -> typing.NoReturn:
         """Write the file header"""
+        LOGGER.debug('Writing archive version %i.%i.%i',
+                     self._vmaj, self._vmin, self._vrev)
         self._handle.write(constants.MAGIC)
         self._write_byte(self._vmaj)
         self._write_byte(self._vmin)
@@ -885,6 +898,7 @@ class Entry:
         data section.
     :var str namespace: The namespace of the entry
     :var str tablespace: The tablespace to use
+    :var str tableam: The table access method
     :var str owner: The owner of the object in Postgres
     :var bool with_oids: Indicates ...
     :var list dependencies: A list of dump_ids of objects that the entry
@@ -905,6 +919,7 @@ class Entry:
     copy_stmt: str = ''
     namespace: str = ''
     tablespace: str = ''
+    tableam: str = ''
     owner: str = ''
     with_oids: bool = False
     dependencies: typing.List[int] = dataclasses.field(default_factory=list)

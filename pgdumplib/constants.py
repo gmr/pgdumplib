@@ -39,10 +39,10 @@ K_OFFSET_NO_DATA: int = 3
 
 MAGIC: bytes = b'PGDMP'
 
-MIN_VER: typing.Tuple[int, int, int] = (1, 12, 0)
+MIN_VER: typing.Tuple[int, int, int] = (1, 13, 0)
 """The minumum supported version of pg_dump files ot support"""
 
-MAX_VER: typing.Tuple[int, int, int] = (1, 13, 0)
+MAX_VER: typing.Tuple[int, int, int] = (1, 14, 0)
 """The maximum supported version of pg_dump files ot support"""
 
 PGDUMP_STRFTIME_FMT: str = '%Y-%m-%d %H:%M:%S %Z'
@@ -66,7 +66,7 @@ SECTIONS: typing.List[str] = [
     SECTION_POST_DATA
 ]
 
-VERSION: typing.Tuple[int, int, int] = (1, 13, 0)
+VERSION: typing.Tuple[int, int, int] = (1, 14, 0)
 """pg_dump file format version to create by default"""
 
 ZLIB_OUT_SIZE: int = 4096

@@ -1,5 +1,9 @@
 # Changelog
 
+## 3.0.0 - 2019-12-05
+
+- Add support for Postgres 12 / pg_dump archive 1.14.0 format
+
 ## 2.1.0 - 2019-11-12
 
 - Add TABLESPACE to supported objects when adding an entry
