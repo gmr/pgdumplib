@@ -248,7 +248,6 @@ class RestoreComparisonTestCase(unittest.TestCase):
     def test_toc_server_version(self):
         self.assertEqual(
             self.dump.server_version, self.info.server_version)
-
     # def test_toc_timestamp(self):
     #     self.assertEqual(
     #         self.dump.timestamp.isoformat(), self.info.timestamp.isoformat())
@@ -268,3 +267,42 @@ class RestoreComparisonNoDataTestCase(RestoreComparisonTestCase):
 class RestoreComparisonDataOnlyTestCase(RestoreComparisonTestCase):
 
     PATH = 'dump.data-only'
+
+
+class KVersionTestCase(unittest.TestCase):
+
+    def test_default(self):
+        instance = dump.Dump()
+        self.assertEqual(instance.version, (1, 14, 0))
+
+    def test_postgres_9_0_1(self):
+        instance = dump.Dump(appear_as='9.0.1')
+        self.assertEqual(instance.version, (1, 12, 0))
+
+    def test_postgres_9_6_4(self):
+        instance = dump.Dump(appear_as='9.6.4')
+        self.assertEqual(instance.version, (1, 12, 0))
+
+    def test_postgres_10_1(self):
+        instance = dump.Dump(appear_as='10.1')
+        self.assertEqual(instance.version, (1, 12, 0))
+
+    def test_postgres_10_3(self):
+        instance = dump.Dump(appear_as='10.3')
+        self.assertEqual(instance.version, (1, 13, 0))
+
+    def test_postgres_11(self):
+        instance = dump.Dump(appear_as='11.0')
+        self.assertEqual(instance.version, (1, 13, 0))
+
+    def test_postgres_12(self):
+        instance = dump.Dump(appear_as='12.0')
+        self.assertEqual(instance.version, (1, 14, 0))
+
+    def test_postgres_8_4_0(self):
+        with self.assertRaises(RuntimeError):
+            dump.Dump(appear_as='8.4.0')
+
+    def test_postgres_100(self):
+        with self.assertRaises(RuntimeError):
+            dump.Dump(appear_as='100.0')

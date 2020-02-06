@@ -45,7 +45,7 @@ LOGGER = logging.getLogger(__name__)
 
 ENCODING_PATTERN = re.compile(r"^.*=\s+'(.*)'")
 
-VERSION_INFO = '{} (pgdumplib {})'.format(constants.APPEAR_AS, version)
+VERSION_INFO = '{} (pgdumplib {})'
 
 
 class Dump:
@@ -65,12 +65,13 @@ class Dump:
             converter: typing.Optional[
                 typing.Type[converters.DataConverter],
                 typing.Type[converters.NoOpConverter],
-                typing.Type[converters.SmartDataConverter]] = None):
-        self.compression: bool = False
-        self.dbname: str = dbname
-        self.dump_version: str = VERSION_INFO
-        self.encoding: str = encoding
-        self.entries: typing.List[Entry] = [
+                typing.Type[converters.SmartDataConverter]] = None,
+            appear_as: str = '12.0'):
+        self.compression = False
+        self.dbname = dbname
+        self.dump_version = VERSION_INFO.format(appear_as, version)
+        self.encoding = encoding
+        self.entries = [
             Entry(
                 dump_id=1, tag=constants.ENCODING, desc=constants.ENCODING,
                 defn="SET client_encoding = '{}';\n".format(self.encoding)),
@@ -82,8 +83,8 @@ class Dump:
                 defn='SELECT pg_catalog.set_config('
                      "'search_path', '', false);\n")
         ]
-        self.server_version: str = VERSION_INFO
-        self.timestamp: datetime.datetime = datetime.datetime.now()
+        self.server_version = self.dump_version
+        self.timestamp = datetime.datetime.now()
 
         converter = converter or converters.DataConverter
         self._converter: converters.DataConverter = converter()
@@ -92,9 +93,11 @@ class Dump:
         self._intsize: int = 4
         self._offsize: int = 8
         self._temp_dir = tempfile.TemporaryDirectory()
-        self._vmaj: int = constants.VERSION[0]
-        self._vmin: int = constants.VERSION[1]
-        self._vrev: int = constants.VERSION[2]
+        k_version = self._get_k_version(
+            tuple(int(v) for v in appear_as.split('.')))
+        self._vmaj: int = k_version[0]
+        self._vmin: int = k_version[1]
+        self._vrev: int = k_version[2]
         self._writers: typing.Dict[int, TableData] = {}
 
     def __repr__(self) -> str:
@@ -104,15 +107,15 @@ class Dump:
     def add_entry(
             self,
             desc: str,
-            namespace: typing.Optional[str] = '',
-            tag: typing.Optional[str] = '',
-            owner: typing.Optional[str] = '',
-            defn: typing.Optional[str] = '',
-            drop_stmt: typing.Optional[str] = '',
-            copy_stmt: typing.Optional[str] = '',
+            namespace: typing.Optional[str] = None,
+            tag: typing.Optional[str] = None,
+            owner: typing.Optional[str] = None,
+            defn: typing.Optional[str] = None,
+            drop_stmt: typing.Optional[str] = None,
+            copy_stmt: typing.Optional[str] = None,
             dependencies: typing.Optional[typing.List[int]] = None,
-            tablespace: typing.Optional[str] = '',
-            tableam: typing.Optional[str] = '',
+            tablespace: typing.Optional[str] = None,
+            tableam: typing.Optional[str] = None,
             dump_id: typing.Optional[int] = None) -> Entry:
         """Add an entry to the dump
 
@@ -382,6 +385,15 @@ class Dump:
         """
         return [e for e in self.entries if e.section == constants.SECTION_DATA]
 
+    @staticmethod
+    def _get_k_version(appear_as: typing.Tuple[int, int]) \
+            -> typing.Tuple[int, int, int]:
+        for (min_ver, max_ver), value in constants.K_VERSION_MAP.items():
+            if min_ver <= appear_as <= max_ver:
+                return value
+        raise RuntimeError(
+            'Unsupported PostgreSQL version: {}'.format(appear_as))
+
     def _next_dump_id(self) -> int:
         """Get the next ``dump_id`` that is available for adding an entry
 
@@ -558,7 +570,7 @@ class Dump:
         if sign is None:
             return None
         bs, bv, value = 0, 0, 0
-        for offset in range(0, self._intsize):
+        for _offset in range(0, self._intsize):
             bv = (self._read_byte() or 0) & 0xFF
             if bv != 0:
                 value += (bv << bs)
@@ -706,6 +718,9 @@ class Dump:
 
         saved = self._write_section(
             constants.SECTION_PRE_DATA, [
+                constants.GROUP,
+                constants.ROLE,
+                constants.USER,
                 constants.SCHEMA,
                 constants.EXTENSION,
                 constants.AGGREGATE,
@@ -753,6 +768,7 @@ class Dump:
         self._write_str(entry.namespace)
         self._write_str(entry.tablespace)
         if self.version >= (1, 14, 0):
+            LOGGER.debug('Adding tableam')
             self._write_str(entry.tableam)
         self._write_str(entry.owner)
         self._write_str('true' if entry.with_oids else 'false')
@@ -782,7 +798,7 @@ class Dump:
         self._write_byte(1 if value < 0 else 0)
         if value < 0:
             value = -value
-        for offset in range(0, self._intsize):
+        for _offset in range(0, self._intsize):
             self._write_byte(value & 0xFF)
             value >>= 8
 
@@ -820,6 +836,7 @@ class Dump:
         out = value.encode(self.encoding) if value else b''
         self._write_int(len(out))
         if out:
+            LOGGER.debug('Writing %r', out)
             self._handle.write(out)
 
     def _write_table_data(self, dump_id: int) -> int:
@@ -910,17 +927,17 @@ class Entry:
     """
     dump_id: int
     had_dumper: bool = False
-    table_oid: str = ''
-    oid: str = ''
-    tag: str = ''
-    desc: str = ''
-    defn: str = ''
-    drop_stmt: str = ''
-    copy_stmt: str = ''
-    namespace: str = ''
-    tablespace: str = ''
-    tableam: str = ''
-    owner: str = ''
+    table_oid: str = '0'
+    oid: str = '0'
+    tag: typing.Optional[str] = None
+    desc: typing.Optional[str] = None
+    defn: typing.Optional[str] = None
+    drop_stmt: typing.Optional[str] = None
+    copy_stmt: typing.Optional[str] = None
+    namespace: typing.Optional[str] = None
+    tablespace: typing.Optional[str] = None
+    tableam: typing.Optional[str] = None
+    owner: typing.Optional[str] = None
     with_oids: bool = False
     dependencies: typing.List[int] = dataclasses.field(default_factory=list)
     data_state: int = constants.K_OFFSET_NO_DATA

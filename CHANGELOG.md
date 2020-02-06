@@ -1,5 +1,10 @@
 # Changelog
 
+## 3.1.0 - 2020-02-06
+
+- Add configurable version support and appropriately set dump version based upon Postgres version
+- When sorting while saving, prefer GROUP, ROLE, and USER before all other objects
+
 ## 3.0.0 - 2019-12-05
 
 - Add support for Postgres 12 / pg_dump archive 1.14.0 format

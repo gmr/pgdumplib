@@ -6,8 +6,11 @@ unless you are hacking on the library itself.
 """
 import typing
 
-APPEAR_AS: str = '12.0'
-"""Version of PostgreSQL to appear as"""
+K_VERSION_MAP = {
+    ((9, 0, 0), (10, 2)): (1, 12, 0),
+    ((10, 3), (11, 99)): (1, 13, 0),
+    ((12, 0), (99, 99)): (1, 14, 0)
+}
 
 BLK_DATA: bytes = b'\x01'
 BLK_BLOBS: bytes = b'\x03'
@@ -39,7 +42,7 @@ K_OFFSET_NO_DATA: int = 3
 
 MAGIC: bytes = b'PGDMP'
 
-MIN_VER: typing.Tuple[int, int, int] = (1, 13, 0)
+MIN_VER: typing.Tuple[int, int, int] = (1, 12, 0)
 """The minumum supported version of pg_dump files ot support"""
 
 MAX_VER: typing.Tuple[int, int, int] = (1, 14, 0)
@@ -66,7 +69,7 @@ SECTIONS: typing.List[str] = [
     SECTION_POST_DATA
 ]
 
-VERSION: typing.Tuple[int, int, int] = (1, 14, 0)
+VERSION: typing.Tuple[int, int, int] = (1, 12, 0)
 """pg_dump file format version to create by default"""
 
 ZLIB_OUT_SIZE: int = 4096
