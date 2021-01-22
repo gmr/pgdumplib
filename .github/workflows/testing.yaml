@@ -36,7 +36,7 @@ jobs:
         uses: actions/checkout@v1
 
       - name: Setup environment
-        run: apk --update add gcc libffi-dev libpq make musl-dev postgresql postgresql-dev linux-headers tzdata
+        run: apk --update add gcc libffi-dev libpq make musl-dev postgresql postgresql-dev linux-headers tzdata --repository=http://dl-cdn.alpinelinux.org/alpine/edge/main
 
       - name: Install testing dependencies
         run: pip3 install -r requires/testing.txt
