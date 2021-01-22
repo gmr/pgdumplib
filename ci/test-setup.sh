@@ -1,4 +1,5 @@
 #!/usr/bin/env sh
+set -e
 mkdir -p build/data
 cp /usr/share/zoneinfo/America/New_York /etc/localtime
 echo "America/New_York" > /etc/timezone
