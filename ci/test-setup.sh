@@ -1,7 +1,9 @@
 #!/usr/bin/env sh
+set -e
 mkdir -p build/data
 cp /usr/share/zoneinfo/America/New_York /etc/localtime
 echo "America/New_York" > /etc/timezone
+export PGPASSWORD=postgres
 if test -f "build/data/dump.not-compressed"; then
   echo "Test data already exists"
 else
@@ -16,6 +18,7 @@ else
 fi
 cat > build/test-environment<<EOF
 export PGDATABASE=postgres
+export PGPASSWORD=postgres
 export PGUSER=postgres
-export POSTGRES_URI=postgresql://postgres@postgres:5432/postgres
+export POSTGRES_URI=postgresql://postgres:postgres@postgres:5432/postgres
 EOF

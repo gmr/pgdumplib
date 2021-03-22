@@ -1,5 +1,6 @@
 name: Testing
 on:
+  pull_request:
   push:
     branches: ["*"]
     paths-ignore:
@@ -13,7 +14,9 @@ jobs:
     runs-on: ubuntu-latest
     services:
       postgres:
-        image: postgres:11
+        image: postgres:${{ matrix.postgres }}
+        env:
+          POSTGRES_PASSWORD: postgres
         options: >-
           --health-cmd pg_isready
           --health-interval 10s
@@ -22,8 +25,10 @@ jobs:
         ports:
           - 5432
     strategy:
+      fail-fast: false
       matrix:
-        python: [3.7, 3.8]
+        python: [3.7, 3.8, 3.9]
+        postgres: [11, 12, 13]
     container:
       image: python:${{ matrix.python }}-alpine
       env:
@@ -33,13 +38,13 @@ jobs:
         uses: actions/checkout@v1
 
       - name: Setup environment
-        run: apk --update add gcc libffi-dev libpq make musl-dev postgresql postgresql-dev linux-headers tzdata
-
-      - name: Setup test/fixture data
-        run: ci/test-setup.sh
+        run: apk --update add gcc bash libffi-dev libpq make musl-dev postgresql postgresql-dev linux-headers tzdata --repository=http://dl-cdn.alpinelinux.org/alpine/edge/main
 
       - name: Install testing dependencies
         run: pip3 install -r requires/testing.txt
+
+      - name: Setup test/fixture data
+        run: ci/test-setup.sh
 
       - name: Install library dependencies
         run: python setup.py develop
@@ -51,7 +56,6 @@ jobs:
         run: nosetests -x
 
       - name: Upload Coverage
-        uses: codecov/codecov-action@v1.0.2
+        uses: codecov/codecov-action@v1
         with:
-          token: ${{secrets.CODECOV_TOKEN}}
           file: build/coverage.xml
