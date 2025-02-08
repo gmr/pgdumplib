@@ -27,7 +27,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python: [3.9, 3.10, 3.11, 3.12, 3.13]
+        python: ["3.9", "3.10", "3.11", "3.12", "3.13"]
         postgres: [14, 15, 16, 17]
     container:
       image: python:${{ matrix.python }}-alpine
