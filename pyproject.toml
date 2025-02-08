@@ -1,0 +1,103 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "pgdumplib"
+version = "3.1.0"
+description = "Python3 library for working with pg_dump files"
+readme = "README.rst"
+license = { text = "BSD 3-Clause License" }
+urls = { Homepage = "https://github.com/gmr/pgdumplib" }
+authors = [
+    { name = "Gavin M. Roy", email = "gavinmroy@gmail.com" }
+]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: BSD License",
+    "Natural Language :: English",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: Implementation :: CPython",
+    "Programming Language :: SQL",
+    "Topic :: Database",
+    "Topic :: Database :: Database Engines/Servers",
+    "Topic :: Software Development :: Libraries",
+    "Topic :: Software Development :: Libraries :: Python Modules"
+]
+dependencies = [
+    "pendulum",
+    "toposort"
+]
+
+[project.optional-dependencies]
+dev = [
+    "build",
+    "coverage",
+    "ruff"
+]
+[tool.coverage.run]
+branch = true
+source = ["pgdumplib"]
+command_line = "-m unittest discover tests --buffer --verbose"
+
+[tool.coverage.report]
+exclude_also = [
+  "typing.TYPE_CHECKING",
+]
+fail_under = 90
+show_missing = true
+
+[tool.coverage.html]
+directory = "build/coverage"
+
+[tool.coverage.xml]
+output = "build/reports/coverage.xml"
+
+[tool.hatch.build]
+artifacts = [
+    "pgdumplib"
+]
+
+[tool.hatch.build.targets.wheel]
+include = [
+    "pgdumplib"
+]
+
+[tool.hatch.env.default]
+python = "python3.9"
+features = ["testing"]
+
+[tool.ruff]
+line-length = 79
+target-version = "py39"
+
+[tool.ruff.lint]
+select = [
+    "ASYNC",  # flake8-async
+    "B",      # flake8-bugbear
+    "BLE",    # flake8-blind-except
+    "C4",     # flake8-comprehensions
+    "DTZ",    # flake8-datetimez
+    "E", "W", # pycodestyle
+    "F",      # pyflakes
+    "G",      # flake8-logging-format
+    "I",      # isort
+    "S",      # flake8-bandit
+    "T20",    # flake8-print
+    "UP",     # pyupgrade
+]
+ignore = [
+  "RSE",      # contradicts Python Style Guide
+]
+flake8-quotes = { inline-quotes = "single" }
+
+[tool.yapf]
+allow_split_before_dict_value = false
+indent_dictionary_value = true
