@@ -7,7 +7,7 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     if: github.event_name == 'push' && startsWith(github.event.ref, 'refs/tags')
-    container: python:3.8-alpine
+    container: python:3.12-alpine
     steps:
       - name: Checkout repository
         uses: actions/checkout@v1
