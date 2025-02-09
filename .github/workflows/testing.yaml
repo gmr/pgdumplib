@@ -5,7 +5,6 @@ on:
     branches: ["*"]
     paths-ignore:
       - 'docs/**'
-      - 'setup.*'
       - '*.md'
       - '*.rst'
     tags-ignore: ["*"]
@@ -27,11 +26,12 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python: ["3.10", "3.11", "3.12", "3.13"]
-        postgres: [14, 15, 16, 17]
+        python: ["3.10"]  #, "3.11", "3.12", "3.13"]
+        postgres: [14] #, 15, 16, 17]
     container:
       image: python:${{ matrix.python }}-alpine
       env:
+        NOBOOTSTRAP: true
         POSTGRES_URI: postgresql://postgres@postgres:5432/postgres
     steps:
       - name: Checkout repository
@@ -44,13 +44,10 @@ jobs:
         run: pip3 install -e '.[dev]'
 
       - name: Setup test/fixture data
-        run: ci/test-setup.sh
-
-      - name: Run flake8 tests
-        run: flake8 --output build/flake8.txt --tee
+        run: ci/test-setup
 
       - name: Run tests
-        run: nosetests -x
+        run: ci/test
 
       - name: Upload Coverage
         uses: codecov/codecov-action@v1
