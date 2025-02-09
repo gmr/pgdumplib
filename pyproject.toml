@@ -39,10 +39,11 @@ dev = [
     "build",
     "coverage",
     "faker",
+    "maya",
     "pre-commit",
     "psycopg",
     "ruff",
-    "yapf"
+    "yapf[third_party]"
 ]
 [tool.coverage.run]
 branch = true

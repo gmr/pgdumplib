@@ -6,6 +6,8 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
+    environment:
+      POSTGRES_HOST_AUTH_METHOD: trust
     ports:
       - 5432
     volumes:

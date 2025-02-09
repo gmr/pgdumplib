@@ -26,23 +26,22 @@ report_done() {
   printf "${COLOR_GREEN}done${COLOR_RESET}\n"
 }
 
-wait_for_healthy_containers() {
-  IDs=$(docker compose ps -q | paste -sd " " -)
-  report_start "${1} containers to report healthy"
-  counter="0"
-  while true
-  do
-    if [ "$(docker inspect -f "{{.State.Health.Status}}" ${IDs} | grep -c healthy)" -eq "${1}" ]; then
-      break
-    fi
-    counter=$((++counter))
-    if [ "${counter}" -eq 120 ]; then
-      echo " ERROR: containers failed to start"
-      exit 1
-    fi
-    sleep 1
-  done
-  report_done
+wait_for() {
+  printf 'Waiting for %s... ' $1
+    counter="0"
+    while true
+    do
+      if [ "$( docker compose ps | grep $1 | grep -c healthy )" -eq 1 ]; then
+        break
+      fi
+      counter=$((counter+1))
+      if [ "${counter}" -eq 120 ]; then
+        echo " ERROR: container failed to start"
+        exit 1
+      fi
+      sleep 1
+    done
+    echo 'done.'
 }
 
 # Ensure Docker is Running
@@ -64,7 +63,7 @@ mkdir -p build build/data
 docker compose down --volumes --remove-orphans
 docker compose up -d --quiet-pull
 
-wait_for_healthy_containers 1
+wait_for postgres
 
 PGPORT=$(get_exposed_port postgres 5432)
 
