@@ -8,14 +8,11 @@ sys.path.insert(0, os.path.abspath('..'))
 master_doc = 'index'
 project = 'pgdumplib'
 release = version = pkg_resources.get_distribution(project).version
-copyright = '{}, Gavin M. Roy'.format(datetime.date.today().year)
+copyright = f'{datetime.date.now(tz=datetime.UTC).year}, Gavin M. Roy'
 
 extensions = [
-    'sphinx.ext.autodoc',
-    'sphinx_autodoc_typehints',
-    'sphinx.ext.autosummary',
-    'sphinx.ext.intersphinx',
-    'sphinx.ext.viewcode'
+    'sphinx.ext.autodoc', 'sphinx_autodoc_typehints', 'sphinx.ext.autosummary',
+    'sphinx.ext.intersphinx', 'sphinx.ext.viewcode'
 ]
 
 templates_path = ['_templates']

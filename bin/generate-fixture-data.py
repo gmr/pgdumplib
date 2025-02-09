@@ -3,17 +3,15 @@ import argparse
 import datetime
 import logging
 import os
-from os import path
 import random
+from os import path
 
 import faker
+import psycopg
 from faker.providers import address, internet, misc, person
-import psycopg2
-from psycopg2 import errors
 
 LOGGER = logging.getLogger(__name__)
 LOGGING_FORMAT = '[%(asctime)-15s] %(levelname)-8s %(message)s'
-
 
 # Faker Supported Locales
 LOCALES = [
@@ -56,22 +54,27 @@ def add_connection_options_to_parser(parser):
 
     """
     conn = parser.add_argument_group('Connection Options')
-    conn.add_argument(
-        '-d', '--dbname', action='store',
-        default=os.environ.get('PGDATABASE', 'postgres'),
-        help='database name to connect to')
-    conn.add_argument(
-        '-h', '--host', action='store',
-        default=os.environ.get('PGHOST', 'localhost'),
-        help='database server host or socket directory')
-    conn.add_argument(
-        '-p', '--port', action='store', type=int,
-        default=int(os.environ.get('PGPORT', 5432)),
-        help='database server port number')
-    conn.add_argument(
-        '-U', '--username', action='store',
-        default=os.environ.get('PGUSER', 'postgres'),
-        help='The PostgreSQL username to operate as')
+    conn.add_argument('-d',
+                      '--dbname',
+                      action='store',
+                      default=os.environ.get('PGDATABASE', 'postgres'),
+                      help='database name to connect to')
+    conn.add_argument('-h',
+                      '--host',
+                      action='store',
+                      default=os.environ.get('PGHOST', 'localhost'),
+                      help='database server host or socket directory')
+    conn.add_argument('-p',
+                      '--port',
+                      action='store',
+                      type=int,
+                      default=int(os.environ.get('PGPORT', 5432)),
+                      help='database server port number')
+    conn.add_argument('-U',
+                      '--username',
+                      action='store',
+                      default=os.environ.get('PGUSER', 'postgres'),
+                      help='The PostgreSQL username to operate as')
 
 
 def add_logging_options_to_parser(parser):
@@ -81,15 +84,18 @@ def add_logging_options_to_parser(parser):
 
     """
     group = parser.add_argument_group(title='Logging Options')
-    group.add_argument(
-        '-L', '--log-file', action='store',
-        help='Log to the specified filename. If not specified, '
-        'log output is sent to STDOUT')
-    group.add_argument(
-        '-v', '--verbose', action='store_true',
-        help='Increase output verbosity')
-    group.add_argument(
-        '--debug', action='store_true', help='Extra verbose debug logging')
+    group.add_argument('-L',
+                       '--log-file',
+                       action='store',
+                       help='Log to the specified filename. If not specified, '
+                       'log output is sent to STDOUT')
+    group.add_argument('-v',
+                       '--verbose',
+                       action='store_true',
+                       help='Increase output verbosity')
+    group.add_argument('--debug',
+                       action='store_true',
+                       help='Extra verbose debug logging')
 
 
 def configure_logging(args):
@@ -108,8 +114,7 @@ def configure_logging(args):
         filename = path.abspath(filename)
         if not path.exists(path.dirname(filename)):
             filename = None
-    logging.basicConfig(level=level, filename=filename,
-                        format=LOGGING_FORMAT)
+    logging.basicConfig(level=level, filename=filename, format=LOGGING_FORMAT)
 
 
 def generate_address(fake, user_id, created_at):
@@ -117,7 +122,7 @@ def generate_address(fake, user_id, created_at):
     last_modified_at = None
     if fake.boolean(chance_of_getting_true=25):
         last_modified_at = created_at + fake.time_delta(
-            end_datetime=datetime.datetime.utcnow())
+            end_datetime=datetime.datetime.now(tz=datetime.UTC))
 
     address1 = fake.street_address()
     address2 = None
@@ -156,7 +161,7 @@ def generate_user(fake, locale_fake, locale, icon_oid):
     last_modified_at = None
     if fake.boolean(chance_of_getting_true=45):
         last_modified_at = created_at + fake.time_delta(
-            end_datetime=datetime.datetime.utcnow())
+            end_datetime=datetime.datetime.now(tz=datetime.UTC))
     name = locale_fake.first_name()
     surname = locale_fake.last_name()
     display_name = None
@@ -164,7 +169,7 @@ def generate_user(fake, locale_fake, locale, icon_oid):
         if fake.boolean(chance_of_getting_true=50):
             display_name = name
         else:
-            display_name = '{} {}'.format(name, surname)
+            display_name = f'{name} {surname}'
     user = {
         'created_at': created_at,
         'last_modified_at': last_modified_at,
@@ -177,7 +182,8 @@ def generate_user(fake, locale_fake, locale, icon_oid):
         'password_salt': fake.uuid4(),
         'password': fake.password(12),  # It's fake data :-p
         'signup_ip': fake.ipv4_public(),
-        'icon': icon_oid}
+        'icon': icon_oid
+    }
     LOGGER.debug('Returning user: %r', user)
     return user
 
@@ -190,12 +196,13 @@ def generate_users(args, cursor):
     fake.add_provider(internet)
     fake.add_provider(misc)
 
-    for offset in range(0, args.user_count):
+    for _offset in range(0, args.user_count):
         # Randomly maybe create a blob
         icon_oid = None
         if fake.boolean(chance_of_getting_true=25):
-            cursor.execute(ICON_SQL, {
-                'data': fake.binary(length=random.randint(10000, 200000))})
+            cursor.execute(
+                ICON_SQL,
+                {'data': fake.binary(length=random.randint(10000, 200000))})
             icon_oid = cursor.fetchone()[0]
 
         locale = fake.random_element(LOCALES)
@@ -203,23 +210,22 @@ def generate_users(args, cursor):
 
         # Create the User
         try:
-            cursor.execute(
-                USER_SQL, generate_user(fake, locale_fake, locale, icon_oid))
-        except errors.UniqueViolation as err:
+            cursor.execute(USER_SQL,
+                           generate_user(fake, locale_fake, locale, icon_oid))
+        except psycopg.IntegrityError as err:
             LOGGER.error('Error creating user: %s', err)
             continue
 
         user = cursor.fetchone()
         LOGGER.info('Created user %s', user[0])
         created_at = user[1]
-        for addr_offset in range(random.randint(0, 2)):
-            cursor.execute(
-                ADDRESS_SQL, generate_address(
-                    locale_fake, user[0], created_at))
+        for _offset in range(random.randint(0, 2)):
+            cursor.execute(ADDRESS_SQL,
+                           generate_address(locale_fake, user[0], created_at))
             addr = cursor.fetchone()
             LOGGER.info('Created address %s for user %s', addr[0], user[0])
             created_at = created_at + fake.time_delta(
-                end_datetime=datetime.datetime.utcnow())
+                end_datetime=datetime.datetime.now(tz=datetime.UTC))
 
 
 def get_locale_faker(locale=None):
@@ -243,9 +249,11 @@ def main(args):
 
     """
     configure_logging(args)
-    conn = psycopg2.connect(
-        host=args.host, port=args.port, dbname=args.dbname, user=args.username)
-    conn.set_session(autocommit=True)
+    conn = psycopg.connect(host=args.host,
+                           port=args.port,
+                           dbname=args.dbname,
+                           user=args.username,
+                           autocommit=True)
     cursor = conn.cursor()
     generate_users(args, cursor)
     conn.close()
@@ -258,7 +266,9 @@ if __name__ == '__main__':
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     add_connection_options_to_parser(parser)
     add_logging_options_to_parser(parser)
-    parser.add_argument(
-        '--user-count', action='store', type=int, default=250,
-        help='How many users to generate')
+    parser.add_argument('--user-count',
+                        action='store',
+                        type=int,
+                        default=250,
+                        help='How many users to generate')
     main(parser.parse_args())

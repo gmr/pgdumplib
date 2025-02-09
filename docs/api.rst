@@ -6,4 +6,3 @@ API
 
 .. automodule:: pgdumplib.dump
    :members:
-

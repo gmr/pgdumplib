@@ -24,8 +24,10 @@ def load(filepath, converter=None):
     return dump.Dump(converter=converter).load(filepath)
 
 
-def new(dbname: str = 'pgdumplib', encoding: str = 'UTF8',
-        converter=None, appear_as: str = '12.0'):
+def new(dbname: str = 'pgdumplib',
+        encoding: str = 'UTF8',
+        converter=None,
+        appear_as: str = '12.0'):
     """Create a new :py:class:`pgdumplib.dump.Dump` instance
 
     :param dbname: The database name for the dump (Default: ``pgdumplib``)
