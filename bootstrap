@@ -75,7 +75,7 @@ docker compose exec postgres /usr/bin/psql -U postgres -d postgres -q -o /dev/nu
 report_done
 
 printf "Generating fixture data ... "
-bin/generate-fixture-data.py -U postgres -h ${TEST_HOST} -p ${PGPORT} -d postgres
+python3 ci/generate-fixture-data.py -U postgres -h ${TEST_HOST} -p ${PGPORT} -d postgres
 report_done
 
 printf "Creating test backups ... "
