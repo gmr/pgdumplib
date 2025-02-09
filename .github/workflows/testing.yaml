@@ -24,7 +24,7 @@ jobs:
         ports:
           - 5432
     strategy:
-      fail-fast: false
+      fail-fast: true
       matrix:
         python: ["3.11"]  #, "3.12", "3.13"]
         postgres: [14] #, 15, 16, 17]
@@ -40,8 +40,17 @@ jobs:
       - name: Setup environment
         run: apk --update add bash cargo gcc git libffi-dev libpq make musl-dev postgresql postgresql-dev linux-headers rust tzdata
 
+      - name: Check cwd
+        run: pwd
+
+      - name: Check git
+        run: which git
+
       - name: Install testing dependencies
         run: pip3 install -e '.[dev]'
+
+      - name: Check pre-commit
+        run: which pre-commit
 
       - name: Setup test/fixture data
         run: ci/test-setup
