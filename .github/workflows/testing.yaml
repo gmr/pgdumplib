@@ -29,8 +29,7 @@ jobs:
         python: ["3.11"]  #, "3.12", "3.13"]
         postgres: [14] #, 15, 16, 17]
     container:
-      image: python:${{ matrix.python }}-alpine
-      options: --user root
+      image: python:${{ matrix.python }}
       env:
         NOBOOTSTRAP: true
         POSTGRES_URI: postgresql://postgres@postgres:5432/postgres
@@ -39,19 +38,10 @@ jobs:
         uses: actions/checkout@v1
 
       - name: Setup environment
-        run: apk --update add bash cargo gcc git libffi-dev libpq make musl-dev postgresql postgresql-dev linux-headers rust tzdata
-
-      - name: Check cwd
-        run: pwd
-
-      - name: Check git
-        run: which git
+        run: apt-get update && apt-get install -y bash cargo gcc git libffi-dev libpq-dev build-essential postgresql postgresql-server-dev-14 rustc tzdata
 
       - name: Install testing dependencies
         run: pip3 install -e '.[dev]'
-
-      - name: Check pre-commit
-        run: which pre-commit
 
       - name: Setup test/fixture data
         run: ci/test-setup
