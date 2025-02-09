@@ -38,7 +38,7 @@ jobs:
         uses: actions/checkout@v1
 
       - name: Setup environment
-        run: apk --update add gcc bash cargo libffi-dev libpq make musl-dev postgresql postgresql-dev linux-headers rust tzdata
+        run: apk --update add bash cargo gcc git libffi-dev libpq make musl-dev postgresql postgresql-dev linux-headers rust tzdata
 
       - name: Install testing dependencies
         run: pip3 install -e '.[dev]'
