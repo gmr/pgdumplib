@@ -38,7 +38,9 @@ jobs:
           python-version: '${{ matrix.python }}'
 
       - name: Setup environment
-        run: apt-get update && apt-get install -y bash cargo gcc git libffi-dev libpq-dev build-essential postgresql postgresql-server-dev-15 rustc tzdata
+        run: |
+          sudo apt-get update
+          apt-get install -y bash cargo gcc git libffi-dev libpq-dev build-essential postgresql postgresql-server-dev-15 rustc tzdata
 
       - name: Install dependencies
         run: |
