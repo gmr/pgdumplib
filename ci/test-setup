@@ -3,13 +3,20 @@ set -e
 mkdir -p build/data
 cp /usr/share/zoneinfo/America/New_York /etc/localtime
 echo "America/New_York" > /etc/timezone
+
 export PGPASSWORD=postgres
+
+if test -e ./env/bin/activate
+then
+    . ./env/bin/activate
+fi
+
 if test -f "build/data/dump.not-compressed"; then
   echo "Test data already exists"
 else
   pgbench -i -h localhost -U postgres postgres
   psql -h localhost -U postgres -d postgres -q -o /dev/null -f fixtures/schema.sql
-  bin/generate-fixture-data.py -U postgres -h localhost  -p 5432 -d postgres
+  python3 ci/generate-fixture-data.py -U postgres -h localhost  -p 5432 -d postgres
   pg_dump -Fc -h localhost -U postgres -f build/data/dump.not-compressed -d postgres --compress=0
   pg_dump -Fc -h localhost -U postgres -f build/data/dump.compressed -d postgres --compress=9
   pg_dump -Fc -h localhost -U postgres -f build/data/dump.no-data -d postgres --compress=0 -s
