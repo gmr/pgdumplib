@@ -6,12 +6,13 @@ import os
 import pathlib
 import re
 import subprocess
+import sys
 import tempfile
 import unittest
 import uuid
 from unittest import mock
 
-import psycopg2
+import psycopg
 
 import pgdumplib
 from pgdumplib import constants, converters, dump, exceptions
@@ -34,6 +35,22 @@ PATTERNS = {
 }
 
 
+class EnvironmentVariableMixin:
+    @classmethod
+    def setUpClass(cls):
+        cls.os_environ = {}
+        path = pathlib.Path(__file__).parent.parent / 'build' / 'test.env'
+        if not path.exists():
+            sys.stderr.write('Failed to find test.env.file\n')
+            return
+        with path.open('r') as f:
+            for line in f:
+                if line.startswith('export '):
+                    line = line[7:]
+                name, _, value = line.strip().partition('=')
+                cls.os_environ[name] = value
+
+
 @dataclasses.dataclass
 class DumpInfo:
     timestamp: datetime.datetime
@@ -48,7 +65,7 @@ class DumpInfo:
     entry_count: int
 
 
-class TestCase(unittest.TestCase):
+class TestCase(unittest.TestCase, EnvironmentVariableMixin):
 
     PATH = 'dump.not-compressed'
     CONVERTER = converters.DataConverter
@@ -100,7 +117,7 @@ class TestCase(unittest.TestCase):
         self.assertIsNone(self.dump.get_entry(dump_id))
 
     def test_read_blobs(self):
-        conn = psycopg2.connect(os.environ['POSTGRES_URI'])
+        conn = psycopg.connect(os.environ['POSTGRES_URI'], autocommit=True)
         cursor = conn.cursor()
         cursor.execute(BLOB_COUNT_SQL)
         expectation = cursor.fetchone()[0]
