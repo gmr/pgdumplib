@@ -1,14 +1,11 @@
 import datetime
-import os
-import sys
+from importlib import metadata
 
-import pkg_resources
-
-sys.path.insert(0, os.path.abspath('..'))
 master_doc = 'index'
 project = 'pgdumplib'
-release = version = pkg_resources.get_distribution(project).version
-copyright = f'{datetime.date.now(tz=datetime.UTC).year}, Gavin M. Roy'
+release = metadata.version('pgdumplib')
+copyright = \
+    f'{datetime.datetime.now(tz=datetime.UTC).date().year}, Gavin M. Roy'
 
 extensions = [
     'sphinx.ext.autodoc', 'sphinx_autodoc_typehints', 'sphinx.ext.autosummary',

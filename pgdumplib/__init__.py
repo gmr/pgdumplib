@@ -5,7 +5,9 @@ instance from a :command:`pg_dump` file created in the `custom` format.
 See the :doc:`examples` page to see how to read a dump or create one.
 
 """
-version = '3.1.0'
+from importlib import metadata
+
+version = metadata.version('pgdumplib')
 
 
 def load(filepath, converter=None):
