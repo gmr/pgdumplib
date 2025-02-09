@@ -22,7 +22,7 @@ jobs:
           --health-timeout 5s
           --health-retries 5
         ports:
-          - 5432
+          - 5432:5432
     strategy:
       fail-fast: true
       matrix:
@@ -54,7 +54,7 @@ jobs:
         run: ci/test
         env:
           NOBOOTSTRAP: true
-          POSTGRES_URI: postgresql://postgres@postgres:5432/postgres
+          POSTGRES_URI: postgresql://postgres:postgres@localhost:5432/postgres
 
       - name: Upload Coverage
         uses: codecov/codecov-action@v1
