@@ -41,6 +41,8 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y bash cargo gcc git libffi-dev libpq-dev build-essential postgresql postgresql-server-dev-16 rustc tzdata
+          sudo cp /usr/share/zoneinfo/America/New_York /etc/localtime
+          sudo echo "America/New_York" > /etc/timezone
 
       - name: Install dependencies
         run: |
@@ -48,7 +50,7 @@ jobs:
           pip install -e '.[dev]'
 
       - name: Setup test/fixture data
-        run: sudo ci/test-setup
+        run: ci/test-setup
 
       - name: Run tests
         run: ci/test
