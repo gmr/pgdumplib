@@ -54,7 +54,6 @@ jobs:
         run: ci/test
         env:
           NOBOOTSTRAP: true
-          POSTGRES_URI: postgresql://postgres:postgres@localhost:5432/postgres
 
       - name: Upload Coverage
         uses: codecov/codecov-action@v1
