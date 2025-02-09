@@ -37,12 +37,15 @@ jobs:
         with:
           python-version: '${{ matrix.python }}'
 
+      - name: Set Timezone
+        uses: szenius/set-timezone@v2.0
+        with:
+          timezoneLinux: "America/New_York"
+
       - name: Setup environment
         run: |
           sudo apt-get update
           sudo apt-get install -y bash cargo gcc git libffi-dev libpq-dev build-essential postgresql postgresql-server-dev-16 rustc tzdata
-          sudo cp /usr/share/zoneinfo/America/New_York /etc/localtime
-          sudo echo "America/New_York" > /etc/timezone
 
       - name: Install dependencies
         run: |
