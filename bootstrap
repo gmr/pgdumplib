@@ -12,9 +12,9 @@ echo "Integration test host: ${TEST_HOST}"
 get_exposed_port() {
   if [ -z $3 ]
   then
-    docker-compose port $1 $2 | cut -d: -f2
+    docker compose port $1 $2 | cut -d: -f2
   else
-    docker-compose port --index=$3 $1 $2 | cut -d: -f2
+    docker compose port --index=$3 $1 $2 | cut -d: -f2
   fi
 }
 
@@ -27,7 +27,7 @@ report_done() {
 }
 
 wait_for_healthy_containers() {
-  IDs=$(docker-compose ps -q | paste -sd " " -)
+  IDs=$(docker compose ps -q | paste -sd " " -)
   report_start "${1} containers to report healthy"
   counter="0"
   while true
@@ -61,18 +61,18 @@ rm -rf build
 mkdir -p build build/data
 
 # Stop any running instances and clean up after them, then pull images
-docker-compose down --volumes --remove-orphans
-docker-compose up -d --quiet-pull
+docker compose down --volumes --remove-orphans
+docker compose up -d --quiet-pull
 
 wait_for_healthy_containers 1
 
 PGPORT=$(get_exposed_port postgres 5432)
 
 echo "Running pgbench ... "
-docker-compose exec postgres /usr/bin/pgbench -i -U postgres postgres
+docker compose exec postgres /usr/bin/pgbench -i -U postgres postgres
 
 printf "Loading fixture schema ... "
-docker-compose exec postgres /usr/bin/psql -U postgres -d postgres -q -o /dev/null -f /fixtures/schema.sql
+docker compose exec postgres /usr/bin/psql -U postgres -d postgres -q -o /dev/null -f /fixtures/schema.sql
 report_done
 
 printf "Generating fixture data ... "
@@ -80,15 +80,15 @@ bin/generate-fixture-data.py -U postgres -h ${TEST_HOST} -p ${PGPORT} -d postgre
 report_done
 
 printf "Creating test backups ... "
-docker-compose exec postgres /usr/bin/pg_dump -Fc -U postgres -f /data/dump.not-compressed -d postgres --compress=0
-docker-compose exec postgres /usr/bin/pg_dump -Fc -U postgres -f /data/dump.compressed -d postgres --compress=9
-docker-compose exec postgres /usr/bin/pg_dump -Fc -U postgres -f /data/dump.no-data -d postgres --compress=0 -s
-docker-compose exec postgres /usr/bin/pg_dump -Fc -U postgres -f /data/dump.data-only -d postgres --compress=0 -a
-docker-compose exec postgres /usr/bin/pg_dump -Fc -U postgres -f /data/dump.inserts -d postgres --compress=0 --inserts
+docker compose exec postgres /usr/bin/pg_dump -Fc -U postgres -f /data/dump.not-compressed -d postgres --compress=0
+docker compose exec postgres /usr/bin/pg_dump -Fc -U postgres -f /data/dump.compressed -d postgres --compress=9
+docker compose exec postgres /usr/bin/pg_dump -Fc -U postgres -f /data/dump.no-data -d postgres --compress=0 -s
+docker compose exec postgres /usr/bin/pg_dump -Fc -U postgres -f /data/dump.data-only -d postgres --compress=0 -a
+docker compose exec postgres /usr/bin/pg_dump -Fc -U postgres -f /data/dump.inserts -d postgres --compress=0 --inserts
 report_done
 
 printf "Fixing permissions ... "
-docker-compose exec postgres chmod -R a+r /data
+docker compose exec postgres chmod -R a+r /data
 report_done
 
 cat > build/test-environment<<EOF

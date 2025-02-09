@@ -3,12 +3,10 @@
 To get setup in the environment and run the tests, take the following steps:
 
 ```bash
-virtualenv -p python3 env
+python3 -m venv env
 source env/bin/activate
-pip install -r requires/testing.txt
-
-nosetests
-flake8
+python3 -m pip install -e '.[dev]'
+python3 -m pip install pre-commit
 ```
 
 ## Test Coverage

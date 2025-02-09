@@ -19,7 +19,6 @@ classifiers = [
     "Natural Language :: English",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
@@ -40,7 +39,11 @@ dependencies = [
 dev = [
     "build",
     "coverage",
-    "ruff"
+    "faker",
+    "pre-commit",
+    "psycopg",
+    "ruff",
+    "yapf"
 ]
 [tool.coverage.run]
 branch = true
@@ -76,7 +79,7 @@ features = ["testing"]
 
 [tool.ruff]
 line-length = 79
-target-version = "py39"
+target-version = "py310"
 
 [tool.ruff.lint]
 select = [
@@ -95,6 +98,7 @@ select = [
 ]
 ignore = [
   "RSE",      # contradicts Python Style Guide
+  "S311",     # We're not doing any cryptography
 ]
 flake8-quotes = { inline-quotes = "single" }
 
