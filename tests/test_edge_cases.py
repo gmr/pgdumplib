@@ -13,7 +13,6 @@ LOGGER = logging.getLogger(__name__)
 
 
 class EdgeTestCase(unittest.TestCase):
-
     @staticmethod
     def _write_byte(handle, value) -> None:
         """Write a byte to the handle"""
@@ -23,7 +22,7 @@ class EdgeTestCase(unittest.TestCase):
         self._write_byte(handle, 1 if value < 0 else 0)
         if value < 0:
             value = -value
-        for offset in range(0, 4):
+        for _offset in range(0, 4):
             self._write_byte(handle, value & 0xFF)
             value >>= 8
 
@@ -35,7 +34,9 @@ class EdgeTestCase(unittest.TestCase):
     def test_invalid_dependency(self):
         dmp = pgdumplib.new('test')
         with self.assertRaises(ValueError):
-            dmp.add_entry(constants.TABLE, '', 'block_table',
+            dmp.add_entry(constants.TABLE,
+                          '',
+                          'block_table',
                           dependencies=[1024])
 
     def test_invalid_block_type_in_data(self):
@@ -69,8 +70,8 @@ class EdgeTestCase(unittest.TestCase):
     def test_dump_id_mismatch_in_data(self):
         dmp = pgdumplib.new('test')
         dmp.add_entry(constants.TABLE_DATA, '', 'block_table', dump_id=1024)
-        with gzip.open(
-                pathlib.Path(dmp._temp_dir.name) / '1024.gz', 'wb') as handle:
+        with gzip.open(pathlib.Path(dmp._temp_dir.name) / '1024.gz',
+                       'wb') as handle:
             handle.write(b'1\t\1\t\1\n')
         dmp.save('build/data/dump.test')
 
@@ -86,7 +87,7 @@ class EdgeTestCase(unittest.TestCase):
             h.write(b'')
         dmp.save('build/data/dump.test')
         dmp = pgdumplib.load('build/data/dump.test')
-        data = [line for line in dmp.table_data('', 'empty_table')]
+        data = list(dmp.table_data('', 'empty_table'))
         self.assertEqual(len(data), 0)
 
     def test_runtime_error_when_pos_not_set(self):

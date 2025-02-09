@@ -20,16 +20,15 @@ class EntityNotFoundError(PgDumpLibException):
     and ``table`` specified were not found.
 
     """
-
     def __init__(self, namespace: str, table: str):
         super().__init__()
         self.namespace = namespace
         self.table = table
 
     def __repr__(self) -> str:  # pragma: nocover
-        return '<EntityNotFound namespace={!r} table={!r}>'.format(
-            self.namespace, self.table)
+        return f'<EntityNotFound namespace={self.namespace!r} ' \
+               f'table={self.table!r}>'
 
     def __str__(self) -> str:  # pragma: nocover
-        return 'Did not find {}.{} in the table of contents'.format(
-            self.namespace, self.table)
+        return f'Did not find {self.namespace}.{self.table} in the table ' \
+               f'of contents'

@@ -16,7 +16,6 @@ Creating your own data converter is easy and should simply extend the
 import datetime
 import decimal
 import ipaddress
-import typing
 import uuid
 
 import pendulum
@@ -33,7 +32,7 @@ class DataConverter:
 
     """
     @staticmethod
-    def convert(row: str) -> typing.Tuple[typing.Optional[str], ...]:
+    def convert(row: str) -> tuple[str | None, ...]:
         """Convert the string based row into a tuple of columns.
 
         :param str row: The row to convert
@@ -56,17 +55,9 @@ class NoOpConverter:
         return row
 
 
-SmartColumn = typing.Union[
-    None,
-    str,
-    int,
-    datetime.datetime,
-    decimal.Decimal,
-    ipaddress.IPv4Address,
-    ipaddress.IPv4Network,
-    ipaddress.IPv6Address,
-    ipaddress.IPv6Network,
-    uuid.UUID]
+SmartColumn = (None | str | int | datetime.datetime | decimal.Decimal
+               | ipaddress.IPv4Address | ipaddress.IPv4Network
+               | ipaddress.IPv6Address | ipaddress.IPv6Network | uuid.UUID)
 
 
 class SmartDataConverter(DataConverter):
@@ -89,7 +80,7 @@ class SmartDataConverter(DataConverter):
         - :py:class:`uuid.UUID`
 
     """
-    def convert(self, row: str) -> typing.Tuple[SmartColumn, ...]:
+    def convert(self, row: str) -> tuple[SmartColumn, ...]:
         """Convert the string based row into a tuple of columns"""
         return tuple(self._convert_column(c) for c in row.split('\t'))
 
@@ -119,8 +110,8 @@ class SmartDataConverter(DataConverter):
             pass
         for tz_fmt in {'Z', 'ZZ', 'z', 'zz'}:
             try:
-                return pendulum.from_format(
-                    column, 'YYYY-MM-DD HH:mm:ss {}'.format(tz_fmt))
+                return pendulum.from_format(column,
+                                            f'YYYY-MM-DD HH:mm:ss {tz_fmt}')
             except ValueError:
                 pass
         return column

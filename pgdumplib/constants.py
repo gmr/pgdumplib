@@ -4,7 +4,6 @@ There are additional undocumented constants, but they should not be of concern
 unless you are hacking on the library itself.
 
 """
-import typing
 
 K_VERSION_MAP = {
     ((9, 0, 0), (10, 2)): (1, 12, 0),
@@ -24,14 +23,7 @@ FORMAT_TAR: int = 3
 FORMAT_NULL: int = 4
 FORMAT_DIRECTORY: int = 5
 
-FORMATS: typing.List[str] = [
-    'Unknown',
-    'Custom',
-    'Files',
-    'Tar',
-    'Null',
-    'Directory'
-]
+FORMATS: list[str] = ['Unknown', 'Custom', 'Files', 'Tar', 'Null', 'Directory']
 
 K_OFFSET_POS_NOT_SET: int = 1
 """Specifies the entry has data but no offset"""
@@ -42,10 +34,10 @@ K_OFFSET_NO_DATA: int = 3
 
 MAGIC: bytes = b'PGDMP'
 
-MIN_VER: typing.Tuple[int, int, int] = (1, 12, 0)
+MIN_VER: tuple[int, int, int] = (1, 12, 0)
 """The minumum supported version of pg_dump files ot support"""
 
-MAX_VER: typing.Tuple[int, int, int] = (1, 14, 0)
+MAX_VER: tuple[int, int, int] = (1, 14, 0)
 """The maximum supported version of pg_dump files ot support"""
 
 PGDUMP_STRFTIME_FMT: str = '%Y-%m-%d %H:%M:%S %Z'
@@ -62,14 +54,11 @@ SECTION_DATA: str = 'DATA'
 SECTION_POST_DATA: str = 'Post-Data'
 """Post-data section for an entry in a dump's table of contents"""
 
-SECTIONS: typing.List[str] = [
-    SECTION_NONE,
-    SECTION_PRE_DATA,
-    SECTION_DATA,
-    SECTION_POST_DATA
+SECTIONS: list[str] = [
+    SECTION_NONE, SECTION_PRE_DATA, SECTION_DATA, SECTION_POST_DATA
 ]
 
-VERSION: typing.Tuple[int, int, int] = (1, 12, 0)
+VERSION: tuple[int, int, int] = (1, 12, 0)
 """pg_dump file format version to create by default"""
 
 ZLIB_OUT_SIZE: int = 4096
@@ -144,7 +133,7 @@ USER: str = 'USER'
 USER_MAPPING: str = 'USER MAPPING'
 VIEW: str = 'VIEW'
 
-SECTION_MAPPING: typing.Dict[str, str] = {
+SECTION_MAPPING: dict[str, str] = {
     ACCESS_METHOD: SECTION_PRE_DATA,
     ACL: SECTION_NONE,
     AGGREGATE: SECTION_PRE_DATA,

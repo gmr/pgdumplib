@@ -10,5 +10,5 @@ def setup_module():
                     line = line[7:]
                 name, _, value = line.strip().partition('=')
                 os.environ[name] = value
-    except IOError:
+    except OSError:
         pass

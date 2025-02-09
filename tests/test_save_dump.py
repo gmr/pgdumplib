@@ -1,9 +1,9 @@
 import dataclasses
+import datetime
 import pathlib
 import unittest
 import uuid
 
-from dateutil import tz
 import faker
 from faker.providers import date_time
 
@@ -12,7 +12,6 @@ from pgdumplib import constants, converters, dump
 
 
 class SavedDumpTestCase(unittest.TestCase):
-
     def setUp(self):
         dmp = pgdumplib.load('build/data/dump.compressed')
         dmp.save('build/data/dump.test')
@@ -42,36 +41,33 @@ class SavedDumpTestCase(unittest.TestCase):
             saved_entry = self.saved.get_entry(original.dump_id)
             for attr in attrs:
                 self.assertEqual(
-                    getattr(original, attr),
-                    getattr(saved_entry, attr),
-                    '{} does not match: {} != {}'.format(
-                        attr, getattr(original, attr),
-                        getattr(saved_entry, attr)))
+                    getattr(original, attr), getattr(saved_entry, attr),
+                    f'{attr} does not match: {getattr(original, attr)} != '
+                    f'{getattr(saved_entry, attr)}')
 
     def test_table_data_matches(self):
         for entry in range(0, len(self.original.entries)):
             if self.original.entries[entry].desc != constants.TABLE_DATA:
                 continue
 
-            original_data = [row for row in self.original.table_data(
-                self.original.entries[entry].namespace,
-                self.original.entries[entry].tag)]
+            original_data = list(
+                self.original.table_data(
+                    self.original.entries[entry].namespace,
+                    self.original.entries[entry].tag))
 
-            saved_data = [row for row in self.saved.table_data(
-                self.original.entries[entry].namespace,
-                self.original.entries[entry].tag)]
+            saved_data = list(
+                self.saved.table_data(self.original.entries[entry].namespace,
+                                      self.original.entries[entry].tag))
 
             for offset in range(0, len(original_data)):
                 self.assertListEqual(
                     list(original_data[offset]), list(saved_data[offset]),
-                    'Data in {}.{} does not match for row {}'.format(
-                        self.original.entries[entry].namespace,
-                        self.original.entries[entry].tag,
-                        offset))
+                    f'Data in {self.original.entries[entry].namespace}.'
+                    f'{self.original.entries[entry].tag} does not match '
+                    f'for row {offset}')
 
 
 class EmptyDumpTestCase(unittest.TestCase):
-
     def test_empty_dump_has_base_entries(self):
         dump = pgdumplib.new('test', 'UTF8')
         self.assertEqual(len(dump.entries), 3)
@@ -85,7 +81,6 @@ class EmptyDumpTestCase(unittest.TestCase):
 
 
 class CreateDumpTestCase(unittest.TestCase):
-
     def tearDown(self) -> None:
         test_file = pathlib.Path('build/data/dump.test')
         if test_file.exists():
@@ -93,52 +88,47 @@ class CreateDumpTestCase(unittest.TestCase):
 
     def test_dump_expectations(self):
         dmp = pgdumplib.new('test', 'UTF8')
-        database = dmp.add_entry(
-            desc=constants.DATABASE,
-            tag='postgres',
-            owner='postgres',
-            defn="""\
+        database = dmp.add_entry(desc=constants.DATABASE,
+                                 tag='postgres',
+                                 owner='postgres',
+                                 defn="""\
             CREATE DATABASE postgres
               WITH TEMPLATE = template0
                    ENCODING = 'UTF8'
                    LC_COLLATE = 'en_US.utf8'
                    LC_CTYPE = 'en_US.utf8';""",
-            drop_stmt='DROP DATABASE postgres')
+                                 drop_stmt='DROP DATABASE postgres')
 
-        dmp.add_entry(
-            constants.COMMENT,
-            tag='DATABASE postgres',
-            owner='postgres',
-            defn="""\
+        dmp.add_entry(constants.COMMENT,
+                      tag='DATABASE postgres',
+                      owner='postgres',
+                      defn="""\
             COMMENT ON DATABASE postgres
                  IS 'default administrative connection database';""",
-            dependencies=[database.dump_id])
+                      dependencies=[database.dump_id])
 
         example = dmp.add_entry(
             constants.TABLE, 'public', 'example', 'postgres',
             'CREATE TABLE public.example (\
               id UUID NOT NULL PRIMARY KEY, \
               created_at TIMESTAMP WITH TIME ZONE, \
-              value TEXT NOT NULL);',
-            'DROP TABLE public.example')
+              value TEXT NOT NULL);', 'DROP TABLE public.example')
 
         columns = 'id', 'created_at', 'value'
 
         fake = faker.Faker()
         fake.add_provider(date_time)
 
-        rows = [
-            (uuid.uuid4(), fake.date_time(tzinfo=tz.tzutc()), 'foo'),
-            (uuid.uuid4(), fake.date_time(tzinfo=tz.tzutc()), 'bar'),
-            (uuid.uuid4(), fake.date_time(tzinfo=tz.tzutc()), 'baz'),
-            (uuid.uuid4(), fake.date_time(tzinfo=tz.tzutc()), 'qux')
-        ]
+        rows = [(uuid.uuid4(), fake.date_time(tzinfo=datetime.UTC), 'foo'),
+                (uuid.uuid4(), fake.date_time(tzinfo=datetime.UTC), 'bar'),
+                (uuid.uuid4(), fake.date_time(tzinfo=datetime.UTC), 'baz'),
+                (uuid.uuid4(), fake.date_time(tzinfo=datetime.UTC), 'qux')]
 
         with dmp.table_data_writer(example, columns) as writer:
             for row in rows:
                 writer.append(*row)
 
-        row = (uuid.uuid4(), fake.date_time(tzinfo=tz.tzutc()), None)
+        row = (uuid.uuid4(), fake.date_time(tzinfo=datetime.UTC), None)
         rows.append(row)
 
         # Append a second time to get same writer
@@ -155,5 +145,5 @@ class CreateDumpTestCase(unittest.TestCase):
         self.assertEqual(entry.desc, 'DATABASE')
         self.assertEqual(entry.owner, 'postgres')
         self.assertEqual(entry.tag, 'postgres')
-        values = [row for row in dmp.table_data('public', 'example')]
+        values = list(dmp.table_data('public', 'example'))
         self.assertListEqual(values, rows)

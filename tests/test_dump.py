@@ -8,8 +8,8 @@ import re
 import subprocess
 import tempfile
 import unittest
-from unittest import mock
 import uuid
+from unittest import mock
 
 import psycopg2
 
@@ -76,8 +76,8 @@ class TestCase(unittest.TestCase):
                 LOGGER.debug('Line: %r', line)
 
     def test_lookup_entry(self):
-        entry = self.dump.lookup_entry(
-            constants.TABLE, 'public', 'pgbench_accounts')
+        entry = self.dump.lookup_entry(constants.TABLE, 'public',
+                                       'pgbench_accounts')
         self.assertEqual(entry.namespace, 'public')
         self.assertEqual(entry.tag, 'pgbench_accounts')
         self.assertEqual(entry.section, constants.SECTION_PRE_DATA)
@@ -91,8 +91,8 @@ class TestCase(unittest.TestCase):
             self.dump.lookup_entry('foo', 'public', 'pgbench_accounts')
 
     def test_get_entry(self):
-        entry = self.dump.lookup_entry(
-            constants.TABLE, 'public', 'pgbench_accounts')
+        entry = self.dump.lookup_entry(constants.TABLE, 'public',
+                                       'pgbench_accounts')
         self.assertEqual(self.dump.get_entry(entry.dump_id), entry)
 
     def test_get_entry_not_found(self):
@@ -130,7 +130,7 @@ class InsertsTestCase(TestCase):
         for line in self.dump.table_data('public', 'pgbench_accounts'):
             self.assertTrue(
                 line.startswith('INSERT INTO public.pgbench_accounts'),
-                'Unexpected start @ row {}: {!r}'.format(count, line))
+                f'Unexpected start @ row {count}: {line!r}')
             count += 1
         self.assertEqual(count, 100000)
 
@@ -149,19 +149,17 @@ class NoDataTestCase(TestCase):
             super().test_table_data_empty()
 
     def test_read_blobs(self):
-        self.assertEqual(len([b for b in self.dump.blobs()]), 0)
+        self.assertEqual(len(list(self.dump.blobs())), 0)
 
 
 class ErrorsTestCase(unittest.TestCase):
-
     def test_missing_file_raises_value_error(self):
         path = pathlib.Path(tempfile.gettempdir()) / str(uuid.uuid4())
         with self.assertRaises(ValueError):
             pgdumplib.load(path)
 
     def test_min_version_failure_raises(self):
-        min_ver = (constants.MIN_VER[0],
-                   constants.MIN_VER[1] + 10,
+        min_ver = (constants.MIN_VER[0], constants.MIN_VER[1] + 10,
                    constants.MIN_VER[2])
         LOGGER.debug('Setting pgdumplib.constants.MIN_VER to %s', min_ver)
         with mock.patch('pgdumplib.constants.MIN_VER', min_ver):
@@ -187,7 +185,6 @@ class ErrorsTestCase(unittest.TestCase):
 
 
 class NewDumpTestCase(unittest.TestCase):
-
     def test_pgdumplib_new(self):
         dmp = pgdumplib.new('test', 'UTF8', converters.SmartDataConverter)
         self.assertIsInstance(dmp, dump.Dump)
@@ -213,9 +210,10 @@ class RestoreComparisonTestCase(unittest.TestCase):
 
     @classmethod
     def _read_dump_info(cls, remote_path) -> DumpInfo:
-        restore = subprocess.run(
-            ['pg_restore', '-l', str(remote_path)],
-            check=True, capture_output=True)
+        restore = subprocess.run(  # noqa: S603
+            ['pg_restore', '-l', str(remote_path)],  # noqa: S607
+            check=True,
+            capture_output=True)
         stdout = restore.stdout.decode('utf-8')
         data = {}
         for key, pattern in PATTERNS.items():
@@ -246,8 +244,8 @@ class RestoreComparisonTestCase(unittest.TestCase):
         self.assertEqual(len(self.dump.entries), self.info.entry_count)
 
     def test_toc_server_version(self):
-        self.assertEqual(
-            self.dump.server_version, self.info.server_version)
+        self.assertEqual(self.dump.server_version, self.info.server_version)
+
     # def test_toc_timestamp(self):
     #     self.assertEqual(
     #         self.dump.timestamp.isoformat(), self.info.timestamp.isoformat())
@@ -270,7 +268,6 @@ class RestoreComparisonDataOnlyTestCase(RestoreComparisonTestCase):
 
 
 class KVersionTestCase(unittest.TestCase):
-
     def test_default(self):
         instance = dump.Dump()
         self.assertEqual(instance.version, (1, 14, 0))
