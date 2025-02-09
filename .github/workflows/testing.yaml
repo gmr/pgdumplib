@@ -48,7 +48,7 @@ jobs:
           pip install -e '.[dev]'
 
       - name: Setup test/fixture data
-        run: ci/test-setup
+        run: sudo ci/test-setup
 
       - name: Run tests
         run: ci/test
