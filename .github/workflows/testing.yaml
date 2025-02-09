@@ -28,26 +28,31 @@ jobs:
       matrix:
         python: ["3.11"]  #, "3.12", "3.13"]
         postgres: [14] #, 15, 16, 17]
-    container:
-      image: python:${{ matrix.python }}
-      env:
-        NOBOOTSTRAP: true
-        POSTGRES_URI: postgresql://postgres@postgres:5432/postgres
     steps:
       - name: Checkout repository
         uses: actions/checkout@v1
 
-      - name: Setup environment
-        run: apt-get update && apt-get install -y bash cargo gcc git libffi-dev libpq-dev build-essential postgresql postgresql-server-dev-14 rustc tzdata
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '${{ matrix.python }}'
 
-      - name: Install testing dependencies
-        run: pip3 install -e '.[dev]'
+      - name: Setup environment
+        run: apt-get update && apt-get install -y bash cargo gcc git libffi-dev libpq-dev build-essential postgresql postgresql-server-dev-15 rustc tzdata
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e '.[dev]'
 
       - name: Setup test/fixture data
         run: ci/test-setup
 
       - name: Run tests
         run: ci/test
+        env:
+          NOBOOTSTRAP: true
+          POSTGRES_URI: postgresql://postgres@postgres:5432/postgres
 
       - name: Upload Coverage
         uses: codecov/codecov-action@v1
