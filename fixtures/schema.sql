@@ -58,4 +58,3 @@ CREATE TABLE addresses (
     postal_code      TEXT                     NOT NULL,
     country          TEXT                     NOT NULL
 );
-
