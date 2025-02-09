@@ -40,7 +40,8 @@ jobs:
       - name: Setup environment
         run: |
           sudo apt-get update
-          sudo apt-get install -y bash cargo gcc git libffi-dev libpq-dev build-essential postgresql postgresql-server-dev-15 rustc tzdata
+          apt-cache search postgresql-server-dev
+          sudo apt-get install -y bash cargo gcc git libffi-dev libpq-dev build-essential postgresql postgresql-server-dev-14 rustc tzdata
 
       - name: Install dependencies
         run: |
