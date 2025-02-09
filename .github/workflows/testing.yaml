@@ -30,6 +30,7 @@ jobs:
         postgres: [14] #, 15, 16, 17]
     container:
       image: python:${{ matrix.python }}-alpine
+      options: --user root
       env:
         NOBOOTSTRAP: true
         POSTGRES_URI: postgresql://postgres@postgres:5432/postgres
