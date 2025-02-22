@@ -327,23 +327,67 @@ class Dump:
         self._set_encoding()
 
         # Cache table data and blobs
+        last_pos = self._handle.tell()
+
         for entry in self._data_entries:
             if entry.data_state == constants.K_OFFSET_NO_DATA:
                 continue
-            elif entry.data_state != constants.K_OFFSET_POS_SET:
-                raise RuntimeError('Unsupported data format')
-            self._handle.seek(entry.offset, io.SEEK_SET)
-            block_type, dump_id = self._read_block_header()
-            if not dump_id or dump_id != entry.dump_id:
-                raise RuntimeError(
-                    f'Dump IDs do not match ({dump_id} != {entry.dump_id}')
-            if block_type == constants.BLK_DATA:
-                self._cache_table_data(dump_id)
-            elif block_type == constants.BLK_BLOBS:
-                self._cache_blobs(dump_id)
-            else:
-                raise RuntimeError(f'Unknown block type: {block_type}')
+
+            elif entry.data_state == constants.K_OFFSET_POS_SET:
+                self._handle.seek(entry.offset, io.SEEK_SET)
+                block_type, dump_id = self._read_block_header()
+                if not dump_id or dump_id != entry.dump_id:
+                    raise RuntimeError(f'Dump IDs do not match ({dump_id} != {entry.dump_id})')
+                self._cache_block_data(block_type, dump_id)
+
+            elif entry.data_state == constants.K_OFFSET_POS_NOT_SET:
+                self._handle.seek(last_pos)
+
+                while True:
+                    pos = self._handle.tell()
+                    try:
+                        block_type, dump_id = self._read_block_header()
+                    except EOFError:
+                        return self
+
+                    if entry.dump_id == dump_id:
+                        break
+
+                    # Cache position for any data blocks we find
+                    data_entry = next((e for e in self._data_entries if e.dump_id == dump_id), None)
+
+                    if data_entry and data_entry.data_state == constants.K_OFFSET_POS_NOT_SET:
+                        data_entry.offset = pos
+                        data_entry.data_state = constants.K_OFFSET_POS_SET
+
+                    # Skip this block
+                    if block_type == constants.BLK_DATA:
+                        self._read_data()
+                    elif block_type == constants.BLK_BLOBS:
+                        self._read_blobs()
+                    else:
+                        raise RuntimeError(f'Unknown block type: {block_type}')
+
+                self._cache_block_data(block_type, dump_id)
+
+                # Read the end marker
+                end_marker = self._read_int()
+                if end_marker != 0:
+                    raise RuntimeError(f'Unexpected end marker: {end_marker}')
+
+                cur_pos = self._handle.tell()
+                if cur_pos > last_pos:
+                    last_pos = cur_pos
+
         return self
+
+    def _cache_block_data(self, block_type, dump_id):
+        if block_type == constants.BLK_DATA:
+            self._cache_table_data(dump_id)
+        elif block_type == constants.BLK_BLOBS:
+            self._cache_blobs(dump_id)
+        else:
+            raise RuntimeError(f'Unexpected block type {block_type}')
 
     def lookup_entry(self, desc: str, namespace: str, tag: str) \
             -> models.Entry | None:
