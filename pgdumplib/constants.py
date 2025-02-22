@@ -8,7 +8,8 @@ unless you are hacking on the library itself.
 K_VERSION_MAP = {
     ((9, 0, 0), (10, 2)): (1, 12, 0),
     ((10, 3), (11, 99)): (1, 13, 0),
-    ((12, 0), (99, 99)): (1, 14, 0)
+    ((12, 0), (15, 99)): (1, 14, 0),
+    ((16, 0), (99, 99)): (1, 15, 0)
 }
 
 BLK_DATA: bytes = b'\x01'
@@ -25,6 +26,22 @@ FORMAT_DIRECTORY: int = 5
 
 FORMATS: list[str] = ['Unknown', 'Custom', 'Files', 'Tar', 'Null', 'Directory']
 
+"""Specifies the compression algorithm used"""
+COMPRESSION_NONE: str = 'none'
+COMPRESSION_GZIP: str = 'gzip'
+COMPRESSION_LZ4: str = 'lz4'
+COMPRESSION_ZSTD: str = 'zstd'
+COMPRESSION_ALGORITHMS: list[str] = [
+    COMPRESSION_NONE,
+    COMPRESSION_GZIP,
+    COMPRESSION_LZ4,
+    COMPRESSION_ZSTD
+]
+SUPPORTED_COMPRESSION_ALGORITHMS: list[str] = [
+    COMPRESSION_NONE,
+    COMPRESSION_GZIP,
+]
+
 K_OFFSET_POS_NOT_SET: int = 1
 """Specifies the entry has data but no offset"""
 K_OFFSET_POS_SET: int = 2
@@ -37,7 +54,7 @@ MAGIC: bytes = b'PGDMP'
 MIN_VER: tuple[int, int, int] = (1, 12, 0)
 """The minumum supported version of pg_dump files ot support"""
 
-MAX_VER: tuple[int, int, int] = (1, 14, 0)
+MAX_VER: tuple[int, int, int] = (1, 15, 0)
 """The maximum supported version of pg_dump files ot support"""
 
 PGDUMP_STRFTIME_FMT: str = '%Y-%m-%d %H:%M:%S %Z'

@@ -136,7 +136,7 @@ class Dump:
                  encoding: str = 'UTF8',
                  converter: Converters | None = None,
                  appear_as: str = '12.0'):
-        self.compression = False
+        self.compression_algorithm = constants.COMPRESSION_NONE
         self.dbname = dbname
         self.dump_version = VERSION_INFO.format(appear_as, version)
         self.encoding = encoding
@@ -307,7 +307,17 @@ class Dump:
             raise ValueError(
                 'Unsupported backup version: {}.{}.{}'.format(*self.version))
 
-        self.compression = self._read_int() != 0
+        if self.version >= (1, 15, 0):
+            self.compression_algorithm = constants.COMPRESSION_ALGORITHMS[self._read_byte()]
+
+            if self.compression_algorithm not in constants.SUPPORTED_COMPRESSION_ALGORITHMS:
+                raise ValueError(
+                    'Unsupported compression algorithm: {}'.format(*self.compression_algorithm))
+        else:
+            self.compression_algorithm = (
+                constants.COMPRESSION_GZIP if self._read_int() != 0 else constants.COMPRESSION_NONE
+            )
+
         self.timestamp = self._read_timestamp()
         self.dbname = self._read_bytes().decode(self.encoding)
         self.server_version = self._read_bytes().decode(self.encoding)
@@ -362,7 +372,7 @@ class Dump:
         """
         if getattr(self, '_handle', None) and not self._handle.closed:
             self._handle.close()
-        self.compression = False
+        self.compression_algorithm = constants.COMPRESSION_NONE
         self._handle = open(path, 'wb')
         self._save()
         self._handle.close()
@@ -529,7 +539,7 @@ class Dump:
         :rtype: bytes
 
         """
-        if self.compression:
+        if self.compression_algorithm != constants.COMPRESSION_NONE:
             return self._read_data_compressed()
         return self._read_data_uncompressed()
 
@@ -970,7 +980,12 @@ class Dump:
         """Write the ToC for the file"""
         self._handle.seek(0)
         self._write_header()
-        self._write_int(int(self.compression))
+
+        if self.version >= (1, 15, 0):
+            self._write_byte(constants.COMPRESSION_ALGORITHMS.index(self.compression_algorithm))
+        else:
+            self._write_int(int(self.compression_algorithm != constants.COMPRESSION_NONE))
+
         self._write_timestamp(self.timestamp)
         self._write_str(self.dbname)
         self._write_str(self.server_version)
