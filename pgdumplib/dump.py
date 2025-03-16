@@ -136,7 +136,7 @@ class Dump:
                  encoding: str = 'UTF8',
                  converter: Converters | None = None,
                  appear_as: str = '12.0'):
-        self.compression = False
+        self.compression_algorithm = constants.COMPRESSION_NONE
         self.dbname = dbname
         self.dump_version = VERSION_INFO.format(appear_as, version)
         self.encoding = encoding
@@ -307,7 +307,17 @@ class Dump:
             raise ValueError(
                 'Unsupported backup version: {}.{}.{}'.format(*self.version))
 
-        self.compression = self._read_int() != 0
+        if self.version >= (1, 15, 0):
+            self.compression_algorithm = constants.COMPRESSION_ALGORITHMS[self._read_byte()]
+
+            if self.compression_algorithm not in constants.SUPPORTED_COMPRESSION_ALGORITHMS:
+                raise ValueError(
+                    'Unsupported compression algorithm: {}'.format(*self.compression_algorithm))
+        else:
+            self.compression_algorithm = (
+                constants.COMPRESSION_GZIP if self._read_int() != 0 else constants.COMPRESSION_NONE
+            )
+
         self.timestamp = self._read_timestamp()
         self.dbname = self._read_bytes().decode(self.encoding)
         self.server_version = self._read_bytes().decode(self.encoding)
@@ -317,23 +327,67 @@ class Dump:
         self._set_encoding()
 
         # Cache table data and blobs
+        last_pos = self._handle.tell()
+
         for entry in self._data_entries:
             if entry.data_state == constants.K_OFFSET_NO_DATA:
                 continue
-            elif entry.data_state != constants.K_OFFSET_POS_SET:
-                raise RuntimeError('Unsupported data format')
-            self._handle.seek(entry.offset, io.SEEK_SET)
-            block_type, dump_id = self._read_block_header()
-            if not dump_id or dump_id != entry.dump_id:
-                raise RuntimeError(
-                    f'Dump IDs do not match ({dump_id} != {entry.dump_id}')
-            if block_type == constants.BLK_DATA:
-                self._cache_table_data(dump_id)
-            elif block_type == constants.BLK_BLOBS:
-                self._cache_blobs(dump_id)
-            else:
-                raise RuntimeError(f'Unknown block type: {block_type}')
+
+            elif entry.data_state == constants.K_OFFSET_POS_SET:
+                self._handle.seek(entry.offset, io.SEEK_SET)
+                block_type, dump_id = self._read_block_header()
+                if not dump_id or dump_id != entry.dump_id:
+                    raise RuntimeError(f'Dump IDs do not match ({dump_id} != {entry.dump_id})')
+                self._cache_block_data(block_type, dump_id)
+
+            elif entry.data_state == constants.K_OFFSET_POS_NOT_SET:
+                self._handle.seek(last_pos)
+
+                while True:
+                    pos = self._handle.tell()
+                    try:
+                        block_type, dump_id = self._read_block_header()
+                    except EOFError:
+                        return self
+
+                    if entry.dump_id == dump_id:
+                        break
+
+                    # Cache position for any data blocks we find
+                    data_entry = next((e for e in self._data_entries if e.dump_id == dump_id), None)
+
+                    if data_entry and data_entry.data_state == constants.K_OFFSET_POS_NOT_SET:
+                        data_entry.offset = pos
+                        data_entry.data_state = constants.K_OFFSET_POS_SET
+
+                    # Skip this block
+                    if block_type == constants.BLK_DATA:
+                        self._read_data()
+                    elif block_type == constants.BLK_BLOBS:
+                        self._read_blobs()
+                    else:
+                        raise RuntimeError(f'Unknown block type: {block_type}')
+
+                self._cache_block_data(block_type, dump_id)
+
+                # Read the end marker
+                end_marker = self._read_int()
+                if end_marker != 0:
+                    raise RuntimeError(f'Unexpected end marker: {end_marker}')
+
+                cur_pos = self._handle.tell()
+                if cur_pos > last_pos:
+                    last_pos = cur_pos
+
         return self
+
+    def _cache_block_data(self, block_type, dump_id):
+        if block_type == constants.BLK_DATA:
+            self._cache_table_data(dump_id)
+        elif block_type == constants.BLK_BLOBS:
+            self._cache_blobs(dump_id)
+        else:
+            raise RuntimeError(f'Unexpected block type {block_type}')
 
     def lookup_entry(self, desc: str, namespace: str, tag: str) \
             -> models.Entry | None:
@@ -362,7 +416,7 @@ class Dump:
         """
         if getattr(self, '_handle', None) and not self._handle.closed:
             self._handle.close()
-        self.compression = False
+        self.compression_algorithm = constants.COMPRESSION_NONE
         self._handle = open(path, 'wb')
         self._save()
         self._handle.close()
@@ -529,7 +583,7 @@ class Dump:
         :rtype: bytes
 
         """
-        if self.compression:
+        if self.compression_algorithm != constants.COMPRESSION_NONE:
             return self._read_data_compressed()
         return self._read_data_uncompressed()
 
@@ -970,7 +1024,12 @@ class Dump:
         """Write the ToC for the file"""
         self._handle.seek(0)
         self._write_header()
-        self._write_int(int(self.compression))
+
+        if self.version >= (1, 15, 0):
+            self._write_byte(constants.COMPRESSION_ALGORITHMS.index(self.compression_algorithm))
+        else:
+            self._write_int(int(self.compression_algorithm != constants.COMPRESSION_NONE))
+
         self._write_timestamp(self.timestamp)
         self._write_str(self.dbname)
         self._write_str(self.server_version)
