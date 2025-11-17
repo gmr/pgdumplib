@@ -32,8 +32,9 @@ import pathlib
 import re
 import struct
 import tempfile
-import typing
 import zlib
+from collections.abc import Generator, Sequence
+from typing import Any, Self
 
 import toposort
 
@@ -111,7 +112,7 @@ class TableData:
         return size
 
     @staticmethod
-    def _convert(column: typing.Any) -> str:
+    def _convert(column: Any) -> str:
         """Convert the column to a string
 
         :param column: The column to convert
@@ -175,7 +176,7 @@ class Dump:
         converter = converter or converters.DataConverter
         self._converter: converters.DataConverter = converter()
         self._format: str = 'Custom'
-        self._handle: typing.BinaryIO | None = None
+        self._handle: io.BufferedWriter | None = None
         self._intsize: int = 4
         self._offsize: int = 8
         self._temp_dir = tempfile.TemporaryDirectory()
@@ -287,14 +288,14 @@ class Dump:
         )
         return self.entries[-1]
 
-    def blobs(self) -> typing.Generator[tuple[int, bytes], None, None]:
+    def blobs(self) -> Generator[tuple[int, bytes], None, None]:
         """Iterator that returns each blob in the dump
 
         :rtype: tuple(int, bytes)
 
         """
 
-        def read_oid(fd: typing.BinaryIO) -> int | None:
+        def read_oid(fd: io.BufferedReader) -> int | None:
             """Small helper function to deduplicate code"""
             try:
                 return struct.unpack('I', fd.read(4))[0]
@@ -321,7 +322,7 @@ class Dump:
                 return entry
         return None
 
-    def load(self, path: os.PathLike) -> typing.Self:
+    def load(self, path: os.PathLike) -> Self:
         """Load the Dumpfile, including extracting all data into a temporary
         directory
 
@@ -407,7 +408,7 @@ class Dump:
 
     def table_data(
         self, namespace: str, table: str
-    ) -> typing.Generator[str | tuple[typing.Any, ...], None, None]:
+    ) -> Generator[str | tuple[Any, ...], None, None]:
         """Iterator that returns data for the given namespace and table
 
         :param str namespace: The namespace/schema for the table
@@ -424,8 +425,8 @@ class Dump:
 
     @contextlib.contextmanager
     def table_data_writer(
-        self, entry: models.Entry, columns: typing.Sequence
-    ) -> typing.Generator[TableData, None, None]:
+        self, entry: models.Entry, columns: Sequence
+    ) -> Generator[TableData, None, None]:
         """A context manager that is used to return a
         :py:class:`~pgdumplib.dump.TableData` instance, which can be used
         to add table data to the dump.
@@ -517,7 +518,7 @@ class Dump:
         """
         return max(e.dump_id for e in self.entries) + 1
 
-    def _read_blobs(self) -> typing.Generator[tuple[int, bytes], None, None]:
+    def _read_blobs(self) -> Generator[tuple[int, bytes], None, None]:
         """Read blobs, returning a tuple of the blob ID and the blob data
 
         :rtype: (int, bytes)
@@ -607,7 +608,7 @@ class Dump:
             buffer.write(self._handle.read(block_length))
         return buffer.getvalue()
 
-    def _read_dependencies(self) -> list:
+    def _read_dependencies(self) -> list[int]:
         """Read in the dependencies for an entry.
 
         :rtype: list
@@ -720,9 +721,7 @@ class Dump:
             value |= bv << (offset * 8)
         return data_state, value
 
-    def _read_table_data(
-        self, dump_id: int
-    ) -> typing.Generator[str, None, None]:
+    def _read_table_data(self, dump_id: int) -> Generator[str, None, None]:
         """Iterate through the data returning on row at a time
 
         :rtype: str
@@ -780,7 +779,7 @@ class Dump:
     @contextlib.contextmanager
     def _tempfile(
         self, dump_id: int, mode: str
-    ) -> typing.Generator[typing.IO[bytes], None, None]:
+    ) -> Generator[io.BufferedReader, None, None]:
         """Open the temp file for the specified dump_id in the specified mode
 
         :param int dump_id: The dump_id for the temp file
@@ -827,7 +826,7 @@ class Dump:
         """
         self._handle.write(struct.pack('B', value))
 
-    def _write_data(self) -> set:
+    def _write_data(self) -> set[int]:
         """Write the data blocks, returning a set of IDs that were written"""
         saved = set({})
         for offset, entry in enumerate(self.entries):
@@ -845,7 +844,7 @@ class Dump:
                 self.entries[offset].data_state = constants.K_OFFSET_POS_SET
         return saved
 
-    def _write_entries(self):
+    def _write_entries(self) -> None:
         self._write_int(len(self.entries))
         saved = set({})
 
@@ -964,7 +963,9 @@ class Dump:
             self._write_byte(value & 0xFF)
             value >>= 8
 
-    def _write_section(self, section: str, obj_types: list, saved: set) -> set:
+    def _write_section(
+        self, section: str, obj_types: list[str], saved: set[int]
+    ) -> set[int]:
         for obj_type in obj_types:
             for entry in [e for e in self.entries if e.desc == obj_type]:
                 self._write_entry(entry)

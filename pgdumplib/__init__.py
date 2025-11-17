@@ -7,11 +7,21 @@ See the :doc:`examples` page to see how to read a dump or create one.
 """
 
 from importlib import metadata
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from pgdumplib import converters, dump
+
+    Converters = (
+        type[converters.DataConverter]
+        | type[converters.NoOpConverter]
+        | type[converters.SmartDataConverter]
+    )
 
 version = metadata.version('pgdumplib')
 
 
-def load(filepath, converter=None):
+def load(filepath: str, converter: 'Converters | None' = None) -> 'dump.Dump':
     """Load a pg_dump file created with -Fd from disk
 
     :param os.PathLike filepath: The path to the dump to load
@@ -30,9 +40,9 @@ def load(filepath, converter=None):
 def new(
     dbname: str = 'pgdumplib',
     encoding: str = 'UTF8',
-    converter=None,
+    converter: 'Converters | None' = None,
     appear_as: str = '12.0',
-):
+) -> 'dump.Dump':
     """Create a new :py:class:`pgdumplib.dump.Dump` instance
 
     :param dbname: The database name for the dump (Default: ``pgdumplib``)
