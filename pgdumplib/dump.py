@@ -21,6 +21,7 @@ gzip compressed data files in a temporary directory that is automatically
 cleaned up when the :py:class:`~pgdumplib.dump.Dump` instance is released.
 
 """
+
 import contextlib
 import datetime
 import gzip
@@ -44,8 +45,11 @@ ENCODING_PATTERN = re.compile(r"^.*=\s+'(.*)'")
 
 VERSION_INFO = '{} (pgdumplib {})'
 
-Converters = (type[converters.DataConverter] | type[converters.NoOpConverter]
-              | type[converters.SmartDataConverter])
+Converters = (
+    type[converters.DataConverter]
+    | type[converters.NoOpConverter]
+    | type[converters.SmartDataConverter]
+)
 
 
 class TableData:
@@ -56,6 +60,7 @@ class TableData:
     :py:meth:`~pgdumplib.dump.Dump.table_data_writer`.
 
     """
+
     def __init__(self, dump_id: int, tempdir: str, encoding: str):
         self.dump_id = dump_id
         self._encoding = encoding
@@ -131,29 +136,38 @@ class Dump:
         (Default: :py:class:`pgdumplib.converters.DataConverter`)
 
     """
-    def __init__(self,
-                 dbname: str = 'pgdumplib',
-                 encoding: str = 'UTF8',
-                 converter: Converters | None = None,
-                 appear_as: str = '12.0'):
+
+    def __init__(
+        self,
+        dbname: str = 'pgdumplib',
+        encoding: str = 'UTF8',
+        converter: Converters | None = None,
+        appear_as: str = '12.0',
+    ):
         self.compression = False
         self.dbname = dbname
         self.dump_version = VERSION_INFO.format(appear_as, version)
         self.encoding = encoding
         self.entries = [
-            models.Entry(dump_id=1,
-                         tag=constants.ENCODING,
-                         desc=constants.ENCODING,
-                         defn=f"SET client_encoding = '{self.encoding}';\n"),
-            models.Entry(dump_id=2,
-                         tag='STDSTRINGS',
-                         desc='STDSTRINGS',
-                         defn="SET standard_conforming_strings = 'on';\n"),
-            models.Entry(dump_id=3,
-                         tag='SEARCHPATH',
-                         desc='SEARCHPATH',
-                         defn='SELECT pg_catalog.set_config('
-                         "'search_path', '', false);\n")
+            models.Entry(
+                dump_id=1,
+                tag=constants.ENCODING,
+                desc=constants.ENCODING,
+                defn=f"SET client_encoding = '{self.encoding}';\n",
+            ),
+            models.Entry(
+                dump_id=2,
+                tag='STDSTRINGS',
+                desc='STDSTRINGS',
+                defn="SET standard_conforming_strings = 'on';\n",
+            ),
+            models.Entry(
+                dump_id=3,
+                tag='SEARCHPATH',
+                desc='SEARCHPATH',
+                defn='SELECT pg_catalog.set_config('
+                "'search_path', '', false);\n",
+            ),
         ]
         self.server_version = self.dump_version
         self.timestamp = datetime.datetime.now(tz=datetime.UTC)
@@ -166,29 +180,34 @@ class Dump:
         self._offsize: int = 8
         self._temp_dir = tempfile.TemporaryDirectory()
         k_version = self._get_k_version(
-            tuple(int(v) for v in appear_as.split('.')))
+            tuple(int(v) for v in appear_as.split('.'))
+        )
         self._vmaj: int = k_version[0]
         self._vmin: int = k_version[1]
         self._vrev: int = k_version[2]
         self._writers: dict[int, TableData] = {}
 
     def __repr__(self) -> str:
-        return f'<Dump format={self._format!r} ' \
-               f'timestamp={self.timestamp.isoformat()!r} ' \
-               f'entry_count={len(self.entries)!r}>'
+        return (
+            f'<Dump format={self._format!r} '
+            f'timestamp={self.timestamp.isoformat()!r} '
+            f'entry_count={len(self.entries)!r}>'
+        )
 
-    def add_entry(self,
-                  desc: str,
-                  namespace: str | None = None,
-                  tag: str | None = None,
-                  owner: str | None = None,
-                  defn: str | None = None,
-                  drop_stmt: str | None = None,
-                  copy_stmt: str | None = None,
-                  dependencies: list[int] | None = None,
-                  tablespace: str | None = None,
-                  tableam: str | None = None,
-                  dump_id: int | None = None) -> models.Entry:
+    def add_entry(
+        self,
+        desc: str,
+        namespace: str | None = None,
+        tag: str | None = None,
+        owner: str | None = None,
+        defn: str | None = None,
+        drop_stmt: str | None = None,
+        copy_stmt: str | None = None,
+        dependencies: list[int] | None = None,
+        tablespace: str | None = None,
+        tableam: str | None = None,
+        dump_id: int | None = None,
+    ) -> models.Entry:
         """Add an entry to the dump
 
         The ``namespace`` and ``tag`` are required.
@@ -245,12 +264,27 @@ class Dump:
         for dependency in dependencies or []:
             if dependency not in dump_ids:
                 raise ValueError(
-                    f'Dependency dump_id {dependency!r} not found')
+                    f'Dependency dump_id {dependency!r} not found'
+                )
         self.entries.append(
-            models.Entry(dump_id or self._next_dump_id(), False, '', '', tag
-                         or '', desc, defn or '', drop_stmt or '', copy_stmt
-                         or '', namespace or '', tablespace or '', tableam
-                         or '', owner or '', False, dependencies or []))
+            models.Entry(
+                dump_id or self._next_dump_id(),
+                False,
+                '',
+                '',
+                tag or '',
+                desc,
+                defn or '',
+                drop_stmt or '',
+                copy_stmt or '',
+                namespace or '',
+                tablespace or '',
+                tableam or '',
+                owner or '',
+                False,
+                dependencies or [],
+            )
+        )
         return self.entries[-1]
 
     def blobs(self) -> typing.Generator[tuple[int, bytes], None, None]:
@@ -259,6 +293,7 @@ class Dump:
         :rtype: tuple(int, bytes)
 
         """
+
         def read_oid(fd: typing.BinaryIO) -> int | None:
             """Small helper function to deduplicate code"""
             try:
@@ -305,7 +340,8 @@ class Dump:
         self._read_header()
         if not constants.MIN_VER <= self.version <= constants.MAX_VER:
             raise ValueError(
-                'Unsupported backup version: {}.{}.{}'.format(*self.version))
+                'Unsupported backup version: {}.{}.{}'.format(*self.version)
+            )
 
         self.compression = self._read_int() != 0
         self.timestamp = self._read_timestamp()
@@ -326,7 +362,8 @@ class Dump:
             block_type, dump_id = self._read_block_header()
             if not dump_id or dump_id != entry.dump_id:
                 raise RuntimeError(
-                    f'Dump IDs do not match ({dump_id} != {entry.dump_id}')
+                    f'Dump IDs do not match ({dump_id} != {entry.dump_id}'
+                )
             if block_type == constants.BLK_DATA:
                 self._cache_table_data(dump_id)
             elif block_type == constants.BLK_BLOBS:
@@ -335,8 +372,9 @@ class Dump:
                 raise RuntimeError(f'Unknown block type: {block_type}')
         return self
 
-    def lookup_entry(self, desc: str, namespace: str, tag: str) \
-            -> models.Entry | None:
+    def lookup_entry(
+        self, desc: str, namespace: str, tag: str
+    ) -> models.Entry | None:
         """Return the entry for the given namespace and tag
 
         :param str desc: The desc / object type of the entry
@@ -367,8 +405,9 @@ class Dump:
         self._save()
         self._handle.close()
 
-    def table_data(self, namespace: str, table: str) \
-            -> typing.Generator[str | tuple[typing.Any, ...], None, None]:
+    def table_data(
+        self, namespace: str, table: str
+    ) -> typing.Generator[str | tuple[typing.Any, ...], None, None]:
         """Iterator that returns data for the given namespace and table
 
         :param str namespace: The namespace/schema for the table
@@ -384,10 +423,9 @@ class Dump:
         raise exceptions.EntityNotFoundError(namespace=namespace, table=table)
 
     @contextlib.contextmanager
-    def table_data_writer(self,
-                          entry: models.Entry,
-                          columns: typing.Sequence) \
-            -> typing.Generator[TableData, None, None]:
+    def table_data_writer(
+        self, entry: models.Entry, columns: typing.Sequence
+    ) -> typing.Generator[TableData, None, None]:
         """A context manager that is used to return a
         :py:class:`~pgdumplib.dump.TableData` instance, which can be used
         to add table data to the dump.
@@ -403,20 +441,23 @@ class Dump:
         if entry.dump_id not in self._writers.keys():
             dump_id = self._next_dump_id()
             self.entries.append(
-                models.Entry(dump_id=dump_id,
-                             had_dumper=True,
-                             tag=entry.tag,
-                             desc=constants.TABLE_DATA,
-                             copy_stmt='COPY {}.{} ({}) FROM stdin;'.format(
-                                 entry.namespace, entry.tag,
-                                 ', '.join(columns)),
-                             namespace=entry.namespace,
-                             owner=entry.owner,
-                             dependencies=[entry.dump_id],
-                             data_state=constants.K_OFFSET_POS_NOT_SET))
-            self._writers[entry.dump_id] = TableData(dump_id,
-                                                     self._temp_dir.name,
-                                                     self.encoding)
+                models.Entry(
+                    dump_id=dump_id,
+                    had_dumper=True,
+                    tag=entry.tag,
+                    desc=constants.TABLE_DATA,
+                    copy_stmt='COPY {}.{} ({}) FROM stdin;'.format(
+                        entry.namespace, entry.tag, ', '.join(columns)
+                    ),
+                    namespace=entry.namespace,
+                    owner=entry.owner,
+                    dependencies=[entry.dump_id],
+                    data_state=constants.K_OFFSET_POS_NOT_SET,
+                )
+            )
+            self._writers[entry.dump_id] = TableData(
+                dump_id, self._temp_dir.name, self.encoding
+            )
         yield self._writers[entry.dump_id]
         return None
 
@@ -462,8 +503,7 @@ class Dump:
         return [e for e in self.entries if e.section == constants.SECTION_DATA]
 
     @staticmethod
-    def _get_k_version(appear_as: tuple[int, int]) \
-            -> tuple[int, int, int]:
+    def _get_k_version(appear_as: tuple[int, int]) -> tuple[int, int, int]:
         for (min_ver, max_ver), value in constants.K_VERSION_MAP.items():
             if min_ver <= appear_as <= max_ver:
                 return value
@@ -609,23 +649,26 @@ class Dump:
         dependencies = self._read_dependencies()
         data_state, offset = self._read_offset()
         self.entries.append(
-            models.Entry(dump_id=dump_id,
-                         had_dumper=had_dumper,
-                         table_oid=table_oid,
-                         oid=oid,
-                         tag=tag,
-                         desc=desc,
-                         defn=defn,
-                         drop_stmt=drop_stmt,
-                         copy_stmt=copy_stmt,
-                         namespace=namespace,
-                         tablespace=tablespace,
-                         tableam=tableam,
-                         owner=owner,
-                         with_oids=with_oids,
-                         dependencies=dependencies,
-                         data_state=data_state or 0,
-                         offset=offset or 0))
+            models.Entry(
+                dump_id=dump_id,
+                had_dumper=had_dumper,
+                table_oid=table_oid,
+                oid=oid,
+                tag=tag,
+                desc=desc,
+                defn=defn,
+                drop_stmt=drop_stmt,
+                copy_stmt=copy_stmt,
+                namespace=namespace,
+                tablespace=tablespace,
+                tableam=tableam,
+                owner=owner,
+                with_oids=with_oids,
+                dependencies=dependencies,
+                data_state=data_state or 0,
+                offset=offset or 0,
+            )
+        )
 
     def _read_header(self) -> None:
         """Read in the dump header
@@ -640,10 +683,12 @@ class Dump:
         self._vrev = struct.unpack('B', self._handle.read(1))[0]
         self._intsize = struct.unpack('B', self._handle.read(1))[0]
         self._offsize = struct.unpack('B', self._handle.read(1))[0]
-        self._format = constants.FORMATS[struct.unpack(
-            'B', self._handle.read(1))[0]]
-        LOGGER.debug('Archive version %i.%i.%i', self._vmaj, self._vmin,
-                     self._vrev)
+        self._format = constants.FORMATS[
+            struct.unpack('B', self._handle.read(1))[0]
+        ]
+        LOGGER.debug(
+            'Archive version %i.%i.%i', self._vmaj, self._vmin, self._vrev
+        )
 
     def _read_int(self) -> int | None:
         """Read in a signed integer
@@ -658,7 +703,7 @@ class Dump:
         for _offset in range(0, self._intsize):
             bv = (self._read_byte() or 0) & 0xFF
             if bv != 0:
-                value += (bv << bs)
+                value += bv << bs
             bs += 8
         return -value if sign else value
 
@@ -675,8 +720,9 @@ class Dump:
             value |= bv << (offset * 8)
         return data_state, value
 
-    def _read_table_data(self, dump_id: int) \
-            -> typing.Generator[str, None, None]:
+    def _read_table_data(
+        self, dump_id: int
+    ) -> typing.Generator[str, None, None]:
         """Iterate through the data returning on row at a time
 
         :rtype: str
@@ -698,22 +744,18 @@ class Dump:
         :rtype: datetime.datetime
 
         """
-        second, minute, hour, day, month, year = (self._read_int(),
-                                                  self._read_int(),
-                                                  self._read_int(),
-                                                  self._read_int(),
-                                                  (self._read_int() or 0) + 1,
-                                                  (self._read_int() or 0) +
-                                                  1900)
+        second, minute, hour, day, month, year = (
+            self._read_int(),
+            self._read_int(),
+            self._read_int(),
+            self._read_int(),
+            (self._read_int() or 0) + 1,
+            (self._read_int() or 0) + 1900,
+        )
         self._read_int()  # DST flag
-        return datetime.datetime(year,
-                                 month,
-                                 day,
-                                 hour,
-                                 minute,
-                                 second,
-                                 0,
-                                 tzinfo=datetime.UTC)
+        return datetime.datetime(
+            year, month, day, hour, minute, second, 0, tzinfo=datetime.UTC
+        )
 
     def _save(self) -> None:
         """Save the dump file to disk"""
@@ -736,8 +778,9 @@ class Dump:
                     return
 
     @contextlib.contextmanager
-    def _tempfile(self, dump_id: int, mode: str) \
-            -> typing.Generator[typing.IO[bytes], None, None]:
+    def _tempfile(
+        self, dump_id: int, mode: str
+    ) -> typing.Generator[typing.IO[bytes], None, None]:
         """Open the temp file for the specified dump_id in the specified mode
 
         :param int dump_id: The dump_id for the temp file
@@ -811,21 +854,42 @@ class Dump:
             self._write_entry(entry)
             saved.add(entry.dump_id)
 
-        saved = self._write_section(constants.SECTION_PRE_DATA, [
-            constants.GROUP, constants.ROLE, constants.USER, constants.SCHEMA,
-            constants.EXTENSION, constants.AGGREGATE, constants.OPERATOR,
-            constants.OPERATOR_CLASS, constants.CAST, constants.COLLATION,
-            constants.CONVERSION, constants.PROCEDURAL_LANGUAGE,
-            constants.FOREIGN_DATA_WRAPPER, constants.FOREIGN_SERVER,
-            constants.SERVER, constants.DOMAIN, constants.TYPE,
-            constants.SHELL_TYPE
-        ], saved)
+        saved = self._write_section(
+            constants.SECTION_PRE_DATA,
+            [
+                constants.GROUP,
+                constants.ROLE,
+                constants.USER,
+                constants.SCHEMA,
+                constants.EXTENSION,
+                constants.AGGREGATE,
+                constants.OPERATOR,
+                constants.OPERATOR_CLASS,
+                constants.CAST,
+                constants.COLLATION,
+                constants.CONVERSION,
+                constants.PROCEDURAL_LANGUAGE,
+                constants.FOREIGN_DATA_WRAPPER,
+                constants.FOREIGN_SERVER,
+                constants.SERVER,
+                constants.DOMAIN,
+                constants.TYPE,
+                constants.SHELL_TYPE,
+            ],
+            saved,
+        )
 
         saved = self._write_section(constants.SECTION_DATA, [], saved)
 
-        saved = self._write_section(constants.SECTION_POST_DATA, [
-            constants.CHECK_CONSTRAINT, constants.CONSTRAINT, constants.INDEX
-        ], saved)
+        saved = self._write_section(
+            constants.SECTION_POST_DATA,
+            [
+                constants.CHECK_CONSTRAINT,
+                constants.CONSTRAINT,
+                constants.INDEX,
+            ],
+            saved,
+        )
 
         saved = self._write_section(constants.SECTION_NONE, [], saved)
         LOGGER.debug('Wrote %i of %i entries', len(saved), len(self.entries))
@@ -861,8 +925,12 @@ class Dump:
 
     def _write_header(self) -> None:
         """Write the file header"""
-        LOGGER.debug('Writing archive version %i.%i.%i', self._vmaj,
-                     self._vmin, self._vrev)
+        LOGGER.debug(
+            'Writing archive version %i.%i.%i',
+            self._vmaj,
+            self._vmin,
+            self._vrev,
+        )
         self._handle.write(constants.MAGIC)
         self._write_byte(self._vmaj)
         self._write_byte(self._vmin)
@@ -904,8 +972,11 @@ class Dump:
         for dump_id in toposort.toposort_flatten(
             {
                 e.dump_id: set(e.dependencies)
-                for e in self.entries if e.section == section
-            }, True):
+                for e in self.entries
+                if e.section == section
+            },
+            True,
+        ):
             if dump_id not in saved:
                 self._write_entry(self.get_entry(dump_id))
                 saved.add(dump_id)

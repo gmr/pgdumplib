@@ -35,6 +35,7 @@ class Entry:
     :var section: The section of the dump file the entry belongs to
 
     """
+
     dump_id: int
     had_dumper: bool = False
     table_oid: str = '0'

@@ -1,4 +1,5 @@
 """Test Reader"""
+
 import dataclasses
 import datetime
 import logging
@@ -31,7 +32,7 @@ PATTERNS = {
     'server_version': re.compile(r'\s+Dumped from database version: (.*)\n'),
     'pg_dump_version': re.compile(r'\s+Dumped by [\w_-]+ version: (.*)\n'),
     'entry_count': re.compile(r'\s+TOC Entries: (.*)\n'),
-    'dump_version': re.compile(r'\s+Dump Version: (.*)\n')
+    'dump_version': re.compile(r'\s+Dump Version: (.*)\n'),
 }
 
 
@@ -45,8 +46,7 @@ class EnvironmentVariableMixin:
             return
         with path.open('r') as f:
             for line in f:
-                if line.startswith('export '):
-                    line = line[7:]
+                line = line.removeprefix('export ')
                 name, _, value = line.strip().partition('=')
                 cls.os_environ[name] = value
 
@@ -66,7 +66,6 @@ class DumpInfo:
 
 
 class TestCase(unittest.TestCase, EnvironmentVariableMixin):
-
     PATH = 'dump.not-compressed'
     CONVERTER = converters.DataConverter
 
@@ -93,23 +92,26 @@ class TestCase(unittest.TestCase, EnvironmentVariableMixin):
                 LOGGER.debug('Line: %r', line)
 
     def test_lookup_entry(self):
-        entry = self.dump.lookup_entry(constants.TABLE, 'public',
-                                       'pgbench_accounts')
+        entry = self.dump.lookup_entry(
+            constants.TABLE, 'public', 'pgbench_accounts'
+        )
         self.assertEqual(entry.namespace, 'public')
         self.assertEqual(entry.tag, 'pgbench_accounts')
         self.assertEqual(entry.section, constants.SECTION_PRE_DATA)
 
     def test_lookup_entry_not_found(self):
         self.assertIsNone(
-            self.dump.lookup_entry(constants.TABLE, 'public', 'foo'))
+            self.dump.lookup_entry(constants.TABLE, 'public', 'foo')
+        )
 
     def test_lookup_entry_invalid_desc(self):
         with self.assertRaises(ValueError):
             self.dump.lookup_entry('foo', 'public', 'pgbench_accounts')
 
     def test_get_entry(self):
-        entry = self.dump.lookup_entry(constants.TABLE, 'public',
-                                       'pgbench_accounts')
+        entry = self.dump.lookup_entry(
+            constants.TABLE, 'public', 'pgbench_accounts'
+        )
         self.assertEqual(self.dump.get_entry(entry.dump_id), entry)
 
     def test_get_entry_not_found(self):
@@ -133,12 +135,10 @@ class TestCase(unittest.TestCase, EnvironmentVariableMixin):
 
 
 class CompressedTestCase(TestCase):
-
     PATH = 'dump.compressed'
 
 
 class InsertsTestCase(TestCase):
-
     CONVERTER = converters.NoOpConverter
     PATH = 'dump.inserts'
 
@@ -147,13 +147,13 @@ class InsertsTestCase(TestCase):
         for line in self.dump.table_data('public', 'pgbench_accounts'):
             self.assertTrue(
                 line.startswith('INSERT INTO public.pgbench_accounts'),
-                f'Unexpected start @ row {count}: {line!r}')
+                f'Unexpected start @ row {count}: {line!r}',
+            )
             count += 1
         self.assertEqual(count, 100000)
 
 
 class NoDataTestCase(TestCase):
-
     HAS_DATA = False
     PATH = 'dump.no-data'
 
@@ -176,8 +176,11 @@ class ErrorsTestCase(unittest.TestCase):
             pgdumplib.load(path)
 
     def test_min_version_failure_raises(self):
-        min_ver = (constants.MIN_VER[0], constants.MIN_VER[1] + 10,
-                   constants.MIN_VER[2])
+        min_ver = (
+            constants.MIN_VER[0],
+            constants.MIN_VER[1] + 10,
+            constants.MIN_VER[2],
+        )
         LOGGER.debug('Setting pgdumplib.constants.MIN_VER to %s', min_ver)
         with mock.patch('pgdumplib.constants.MIN_VER', min_ver):
             with self.assertRaises(ValueError):
@@ -209,7 +212,6 @@ class NewDumpTestCase(unittest.TestCase):
 
 
 class RestoreComparisonTestCase(unittest.TestCase):
-
     PATH = 'dump.not-compressed'
 
     @classmethod
@@ -230,7 +232,8 @@ class RestoreComparisonTestCase(unittest.TestCase):
         restore = subprocess.run(  # noqa: S603
             ['pg_restore', '-l', str(remote_path)],  # noqa: S607
             check=True,
-            capture_output=True)
+            capture_output=True,
+        )
         stdout = restore.stdout.decode('utf-8')
         data = {}
         for key, pattern in PATTERNS.items():
@@ -269,18 +272,15 @@ class RestoreComparisonTestCase(unittest.TestCase):
 
 
 class RestoreComparisonCompressedTestCase(RestoreComparisonTestCase):
-
     PATH = 'dump.compressed'
 
 
 class RestoreComparisonNoDataTestCase(RestoreComparisonTestCase):
-
     HAS_DATA = False
     PATH = 'dump.no-data'
 
 
 class RestoreComparisonDataOnlyTestCase(RestoreComparisonTestCase):
-
     PATH = 'dump.data-only'
 
 

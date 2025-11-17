@@ -4,15 +4,15 @@ pgdumplib specific exceptions
 """
 
 
-class PgDumpLibException(Exception):
+class PgDumpLibError(Exception):
     """Common Base Exception"""
 
 
-class NoDataError(PgDumpLibException):
+class NoDataError(PgDumpLibError):
     """Raised when attempting to work with data when do data entries exist"""
 
 
-class EntityNotFoundError(PgDumpLibException):
+class EntityNotFoundError(PgDumpLibError):
     """Raised when an attempt is made to read data from a relation in a
     dump file but it is not found in the table of contents.
 
@@ -20,15 +20,20 @@ class EntityNotFoundError(PgDumpLibException):
     and ``table`` specified were not found.
 
     """
+
     def __init__(self, namespace: str, table: str):
         super().__init__()
         self.namespace = namespace
         self.table = table
 
     def __repr__(self) -> str:  # pragma: nocover
-        return f'<EntityNotFound namespace={self.namespace!r} ' \
-               f'table={self.table!r}>'
+        return (
+            f'<EntityNotFound namespace={self.namespace!r} '
+            f'table={self.table!r}>'
+        )
 
     def __str__(self) -> str:  # pragma: nocover
-        return f'Did not find {self.namespace}.{self.table} in the table ' \
-               f'of contents'
+        return (
+            f'Did not find {self.namespace}.{self.table} in the table '
+            f'of contents'
+        )

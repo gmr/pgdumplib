@@ -13,6 +13,7 @@ Creating your own data converter is easy and should simply extend the
 :py:class:`DataConverter` class.
 
 """
+
 import datetime
 import decimal
 import ipaddress
@@ -31,6 +32,7 @@ class DataConverter:
     the row as tuple of strings, only converting ``\\N`` to :py:const:`None`.
 
     """
+
     @staticmethod
     def convert(row: str) -> tuple[str | None, ...]:
         """Convert the string based row into a tuple of columns.
@@ -44,6 +46,7 @@ class DataConverter:
 
 class NoOpConverter:
     """Performs no conversion on the row passed in"""
+
     @staticmethod
     def convert(row: str) -> str:
         """Returns the row passed in
@@ -55,9 +58,18 @@ class NoOpConverter:
         return row
 
 
-SmartColumn = (None | str | int | datetime.datetime | decimal.Decimal
-               | ipaddress.IPv4Address | ipaddress.IPv4Network
-               | ipaddress.IPv6Address | ipaddress.IPv6Network | uuid.UUID)
+SmartColumn = (
+    None
+    | str
+    | int
+    | datetime.datetime
+    | decimal.Decimal
+    | ipaddress.IPv4Address
+    | ipaddress.IPv4Network
+    | ipaddress.IPv6Address
+    | ipaddress.IPv6Network
+    | uuid.UUID
+)
 
 
 class SmartDataConverter(DataConverter):
@@ -80,6 +92,7 @@ class SmartDataConverter(DataConverter):
         - :py:class:`uuid.UUID`
 
     """
+
     def convert(self, row: str) -> tuple[SmartColumn, ...]:
         """Convert the string based row into a tuple of columns"""
         return tuple(self._convert_column(c) for c in row.split('\t'))
@@ -110,8 +123,9 @@ class SmartDataConverter(DataConverter):
             pass
         for tz_fmt in {'Z', 'ZZ', 'z', 'zz'}:
             try:
-                return pendulum.from_format(column,
-                                            f'YYYY-MM-DD HH:mm:ss {tz_fmt}')
+                return pendulum.from_format(
+                    column, f'YYYY-MM-DD HH:mm:ss {tz_fmt}'
+                )
             except ValueError:
                 pass
         return column

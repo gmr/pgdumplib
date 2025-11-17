@@ -22,6 +22,7 @@ classifiers = [
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
     "Programming Language :: Python :: Implementation :: CPython",
     "Programming Language :: SQL",
     "Topic :: Database",
@@ -43,7 +44,6 @@ dev = [
     "pre-commit",
     "psycopg",
     "ruff",
-    "yapf[third_party]"
 ]
 [tool.coverage.run]
 branch = true
@@ -74,27 +74,35 @@ include = [
 ]
 
 [tool.hatch.env.default]
-python = "python3.9"
-features = ["testing"]
+python = "python3.12"
+features = ["dev"]
 
 [tool.ruff]
 line-length = 79
-target-version = "py310"
+target-version = "py312"
+
+[tool.ruff.format]
+quote-style = "single"
 
 [tool.ruff.lint]
 select = [
-    "ASYNC",  # flake8-async
-    "B",      # flake8-bugbear
-    "BLE",    # flake8-blind-except
-    "C4",     # flake8-comprehensions
-    "DTZ",    # flake8-datetimez
-    "E", "W", # pycodestyle
-    "F",      # pyflakes
-    "G",      # flake8-logging-format
-    "I",      # isort
-    "S",      # flake8-bandit
-    "T20",    # flake8-print
-    "UP",     # pyupgrade
+    "BLE",      # flake8-blind-except
+    "C4",       # flake8-comprehensions
+    "C90",      # mccabe
+    "E", "W",   # pycodestyle
+    "F",        # pyflakes
+    "G",        # flake8-logging-format
+    "I",        # isort
+    "N",        # pep8-naming
+    "Q",        # flake8-quotes
+    "S",        # flake8-bandit
+    "ASYNC",    # flake8-async
+    "B",        # flake8-bugbear
+    "DTZ",      # flake8-datetimez
+    "FURB",     # refurb
+    "RUF",      # ruff-specific
+    "T20",      # flake8-print
+    "UP",       # pyupgrade
 ]
 ignore = [
   "RSE",      # contradicts Python Style Guide
@@ -102,6 +110,5 @@ ignore = [
 ]
 flake8-quotes = { inline-quotes = "single" }
 
-[tool.yapf]
-allow_split_before_dict_value = false
-indent_dictionary_value = true
+[tool.ruff.lint.mccabe]
+max-complexity = 15

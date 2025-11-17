@@ -41,9 +41,11 @@ class SavedDumpTestCase(unittest.TestCase):
             saved_entry = self.saved.get_entry(original.dump_id)
             for attr in attrs:
                 self.assertEqual(
-                    getattr(original, attr), getattr(saved_entry, attr),
+                    getattr(original, attr),
+                    getattr(saved_entry, attr),
                     f'{attr} does not match: {getattr(original, attr)} != '
-                    f'{getattr(saved_entry, attr)}')
+                    f'{getattr(saved_entry, attr)}',
+                )
 
     def test_table_data_matches(self):
         for entry in range(0, len(self.original.entries)):
@@ -53,18 +55,25 @@ class SavedDumpTestCase(unittest.TestCase):
             original_data = list(
                 self.original.table_data(
                     self.original.entries[entry].namespace,
-                    self.original.entries[entry].tag))
+                    self.original.entries[entry].tag,
+                )
+            )
 
             saved_data = list(
-                self.saved.table_data(self.original.entries[entry].namespace,
-                                      self.original.entries[entry].tag))
+                self.saved.table_data(
+                    self.original.entries[entry].namespace,
+                    self.original.entries[entry].tag,
+                )
+            )
 
             for offset in range(0, len(original_data)):
                 self.assertListEqual(
-                    list(original_data[offset]), list(saved_data[offset]),
+                    list(original_data[offset]),
+                    list(saved_data[offset]),
                     f'Data in {self.original.entries[entry].namespace}.'
                     f'{self.original.entries[entry].tag} does not match '
-                    f'for row {offset}')
+                    f'for row {offset}',
+                )
 
 
 class EmptyDumpTestCase(unittest.TestCase):
@@ -88,41 +97,52 @@ class CreateDumpTestCase(unittest.TestCase):
 
     def test_dump_expectations(self):
         dmp = pgdumplib.new('test', 'UTF8')
-        database = dmp.add_entry(desc=constants.DATABASE,
-                                 tag='postgres',
-                                 owner='postgres',
-                                 defn="""\
+        database = dmp.add_entry(
+            desc=constants.DATABASE,
+            tag='postgres',
+            owner='postgres',
+            defn="""\
             CREATE DATABASE postgres
               WITH TEMPLATE = template0
                    ENCODING = 'UTF8'
                    LC_COLLATE = 'en_US.utf8'
                    LC_CTYPE = 'en_US.utf8';""",
-                                 drop_stmt='DROP DATABASE postgres')
+            drop_stmt='DROP DATABASE postgres',
+        )
 
-        dmp.add_entry(constants.COMMENT,
-                      tag='DATABASE postgres',
-                      owner='postgres',
-                      defn="""\
+        dmp.add_entry(
+            constants.COMMENT,
+            tag='DATABASE postgres',
+            owner='postgres',
+            defn="""\
             COMMENT ON DATABASE postgres
                  IS 'default administrative connection database';""",
-                      dependencies=[database.dump_id])
+            dependencies=[database.dump_id],
+        )
 
         example = dmp.add_entry(
-            constants.TABLE, 'public', 'example', 'postgres',
+            constants.TABLE,
+            'public',
+            'example',
+            'postgres',
             'CREATE TABLE public.example (\
               id UUID NOT NULL PRIMARY KEY, \
               created_at TIMESTAMP WITH TIME ZONE, \
-              value TEXT NOT NULL);', 'DROP TABLE public.example')
+              value TEXT NOT NULL);',
+            'DROP TABLE public.example',
+        )
 
         columns = 'id', 'created_at', 'value'
 
         fake = faker.Faker()
         fake.add_provider(date_time)
 
-        rows = [(uuid.uuid4(), fake.date_time(tzinfo=datetime.UTC), 'foo'),
-                (uuid.uuid4(), fake.date_time(tzinfo=datetime.UTC), 'bar'),
-                (uuid.uuid4(), fake.date_time(tzinfo=datetime.UTC), 'baz'),
-                (uuid.uuid4(), fake.date_time(tzinfo=datetime.UTC), 'qux')]
+        rows = [
+            (uuid.uuid4(), fake.date_time(tzinfo=datetime.UTC), 'foo'),
+            (uuid.uuid4(), fake.date_time(tzinfo=datetime.UTC), 'bar'),
+            (uuid.uuid4(), fake.date_time(tzinfo=datetime.UTC), 'baz'),
+            (uuid.uuid4(), fake.date_time(tzinfo=datetime.UTC), 'qux'),
+        ]
 
         with dmp.table_data_writer(example, columns) as writer:
             for row in rows:

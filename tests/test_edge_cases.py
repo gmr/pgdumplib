@@ -34,10 +34,9 @@ class EdgeTestCase(unittest.TestCase):
     def test_invalid_dependency(self):
         dmp = pgdumplib.new('test')
         with self.assertRaises(ValueError):
-            dmp.add_entry(constants.TABLE,
-                          '',
-                          'block_table',
-                          dependencies=[1024])
+            dmp.add_entry(
+                constants.TABLE, '', 'block_table', dependencies=[1024]
+            )
 
     def test_invalid_block_type_in_data(self):
         dmp = pgdumplib.new('test')
@@ -70,8 +69,9 @@ class EdgeTestCase(unittest.TestCase):
     def test_dump_id_mismatch_in_data(self):
         dmp = pgdumplib.new('test')
         dmp.add_entry(constants.TABLE_DATA, '', 'block_table', dump_id=1024)
-        with gzip.open(pathlib.Path(dmp._temp_dir.name) / '1024.gz',
-                       'wb') as handle:
+        with gzip.open(
+            pathlib.Path(dmp._temp_dir.name) / '1024.gz', 'wb'
+        ) as handle:
             handle.write(b'1\t\1\t\1\n')
         dmp.save('build/data/dump.test')
 

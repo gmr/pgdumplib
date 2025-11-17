@@ -8,7 +8,7 @@ unless you are hacking on the library itself.
 K_VERSION_MAP = {
     ((9, 0, 0), (10, 2)): (1, 12, 0),
     ((10, 3), (11, 99)): (1, 13, 0),
-    ((12, 0), (99, 99)): (1, 14, 0)
+    ((12, 0), (99, 99)): (1, 14, 0),
 }
 
 BLK_DATA: bytes = b'\x01'
@@ -55,7 +55,10 @@ SECTION_POST_DATA: str = 'Post-Data'
 """Post-data section for an entry in a dump's table of contents"""
 
 SECTIONS: list[str] = [
-    SECTION_NONE, SECTION_PRE_DATA, SECTION_DATA, SECTION_POST_DATA
+    SECTION_NONE,
+    SECTION_PRE_DATA,
+    SECTION_DATA,
+    SECTION_POST_DATA,
 ]
 
 VERSION: tuple[int, int, int] = (1, 12, 0)
@@ -199,5 +202,5 @@ SECTION_MAPPING: dict[str, str] = {
     TEXT_SEARCH_TEMPLATE: SECTION_PRE_DATA,
     USER: SECTION_NONE,
     USER_MAPPING: SECTION_PRE_DATA,
-    VIEW: SECTION_PRE_DATA
+    VIEW: SECTION_PRE_DATA,
 }

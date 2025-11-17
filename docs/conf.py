@@ -4,12 +4,16 @@ from importlib import metadata
 master_doc = 'index'
 project = 'pgdumplib'
 release = metadata.version('pgdumplib')
-copyright = \
+copyright = (
     f'{datetime.datetime.now(tz=datetime.UTC).date().year}, Gavin M. Roy'
+)
 
 extensions = [
-    'sphinx.ext.autodoc', 'sphinx_autodoc_typehints', 'sphinx.ext.autosummary',
-    'sphinx.ext.intersphinx', 'sphinx.ext.viewcode'
+    'sphinx.ext.autodoc',
+    'sphinx_autodoc_typehints',
+    'sphinx.ext.autosummary',
+    'sphinx.ext.intersphinx',
+    'sphinx.ext.viewcode',
 ]
 
 templates_path = ['_templates']

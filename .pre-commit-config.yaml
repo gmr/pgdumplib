@@ -1,27 +1,19 @@
-# See https://pre-commit.com for more information
-# See https://pre-commit.com/hooks.html for more hooks
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v5.0.0
+    rev: v6.0.0
     hooks:
-      - id: check-shebang-scripts-are-executable
+      - id: check-ast
       - id: check-toml
       - id: check-yaml
-        exclude: .gitlab-ci.yml
-        args:
-          - "--allow-multiple-documents"
+        args: [--allow-multiple-documents]
       - id: debug-statements
       - id: end-of-file-fixer
       - id: mixed-line-ending
       - id: trailing-whitespace
-  - repo: https://github.com/google/yapf
-    rev: v0.31.0
-    hooks:
-      - id: yapf
-        additional_dependencies:
-          - toml
+
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.8.0
+    rev: v0.14.5
     hooks:
+      - id: ruff-format
       - id: ruff
-        args: ["--fix"]
+        args: [--fix]
