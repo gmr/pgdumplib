@@ -45,6 +45,11 @@ dev = [
     "psycopg",
     "ruff",
 ]
+docs = [
+    "mkdocs",
+    "mkdocs-material",
+    "mkdocstrings[python]",
+]
 [tool.coverage.run]
 branch = true
 source = ["pgdumplib"]
