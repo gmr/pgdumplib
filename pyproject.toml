@@ -43,6 +43,7 @@ dev = [
     "maya",
     "pre-commit",
     "psycopg",
+    "python-dotenv",
     "ruff",
 ]
 docs = [

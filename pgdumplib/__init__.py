@@ -6,13 +6,14 @@ See the :doc:`examples` page to see how to read a dump or create one.
 
 """
 
+import pathlib
 from importlib import metadata
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from pgdumplib import converters, dump
 
-    Converters = (
+    Converters: type = (
         type[converters.DataConverter]
         | type[converters.NoOpConverter]
         | type[converters.SmartDataConverter]
@@ -21,7 +22,9 @@ if TYPE_CHECKING:
 version = metadata.version('pgdumplib')
 
 
-def load(filepath: str, converter: 'Converters | None' = None) -> 'dump.Dump':
+def load(
+    filepath: str | pathlib.Path, converter: 'Converters | None' = None
+) -> 'dump.Dump':
     """Load a pg_dump file created with -Fd from disk
 
     :param os.PathLike filepath: The path to the dump to load

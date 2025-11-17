@@ -104,7 +104,13 @@ Tests inherit from `EnvironmentVariableMixin` to load connection info from `buil
 
 ## PostgreSQL Version Support
 
-The library supports PostgreSQL 12-18 with dump format versions 1.12.0-1.14.0. Version mapping is defined in `constants.K_VERSION_MAP`.
+The library supports PostgreSQL 9-18 with dump format versions 1.12.0-1.16.0. Version mapping is defined in `constants.K_VERSION_MAP`.
+
+- Format version 1.12.0: PostgreSQL 9.0-10.2 (separate BLOB entries)
+- Format version 1.13.0: PostgreSQL 10.3-11.x (search_path behavior change)
+- Format version 1.14.0: PostgreSQL 12-15 (table access methods)
+- Format version 1.15.0: PostgreSQL 16 (compression algorithm in header)
+- Format version 1.16.0: PostgreSQL 17-18 (BLOB METADATA entries, multiple BLOBS, relkind)
 
 ## CI/CD
 

@@ -14,9 +14,13 @@ import uuid
 from unittest import mock
 
 import psycopg
+from dotenv import load_dotenv
 
 import pgdumplib
 from pgdumplib import constants, converters, dump, exceptions
+
+# Load environment variables from .env file
+load_dotenv()
 
 LOGGER = logging.getLogger(__name__)
 
@@ -241,7 +245,8 @@ class RestoreComparisonTestCase(unittest.TestCase):
             if not match:
                 LOGGER.warning('No match for %s', key)
             elif key == 'compression':
-                data[key] = match[0] != '0'
+                # pg_restore outputs 'none', '0', or compression level
+                data[key] = match[0] not in ('0', 'none')
             elif key == 'entry_count':
                 data[key] = int(match[0])
             else:

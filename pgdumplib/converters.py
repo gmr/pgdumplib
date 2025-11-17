@@ -122,10 +122,13 @@ class SmartDataConverter(DataConverter):
         except ValueError:
             pass
         for tz_fmt in {'Z', 'ZZ', 'z', 'zz'}:
-            try:
-                return pendulum.from_format(
-                    column, f'YYYY-MM-DD HH:mm:ss {tz_fmt}'
-                )
-            except ValueError:
-                pass
+            for micro_fmt in {'.SSSSSS', ''}:
+                try:
+                    pdt = pendulum.from_format(
+                        column, f'YYYY-MM-DD HH:mm:ss{micro_fmt} {tz_fmt}'
+                    )
+                    # Convert pendulum DateTime to datetime.datetime
+                    return datetime.datetime.fromisoformat(pdt.isoformat())
+                except ValueError:
+                    pass
         return column

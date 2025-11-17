@@ -4,17 +4,20 @@ import pathlib
 import unittest
 import uuid
 
+import dotenv
 import faker
 from faker.providers import date_time
 
 import pgdumplib
-from pgdumplib import constants, converters, dump
+from pgdumplib import constants, converters, models
+
+dotenv.load_dotenv()
 
 
 class SavedDumpTestCase(unittest.TestCase):
     def setUp(self):
         dmp = pgdumplib.load('build/data/dump.compressed')
-        dmp.save('build/data/dump.test')
+        dmp.save(pathlib.Path('build/data/dump.test'))
         self.original = pgdumplib.load('build/data/dump.compressed')
         self.saved = pgdumplib.load('build/data/dump.test')
 
@@ -23,9 +26,11 @@ class SavedDumpTestCase(unittest.TestCase):
         if test_file.exists():
             test_file.unlink()
 
-    # def test_timestamp_matches(self):
-    #    self.assertEqual(self.original.timestamp.isoformat(),
-    #                     self.saved.timestamp.isoformat())
+    def test_timestamp_matches(self):
+        self.assertEqual(
+            self.original.timestamp.isoformat(),
+            self.saved.timestamp.isoformat(),
+        )
 
     def test_version_matches(self):
         self.assertEqual(self.original.version, self.saved.version)
@@ -35,7 +40,7 @@ class SavedDumpTestCase(unittest.TestCase):
         self.assertFalse(self.saved.compression)
 
     def test_entries_mostly_match(self):
-        attrs = [e.name for e in dataclasses.fields(dump.Entry)]
+        attrs = [e.name for e in dataclasses.fields(models.Entry)]
         attrs.remove('offset')
         for original in self.original.entries:
             saved_entry = self.saved.get_entry(original.dump_id)
@@ -78,12 +83,12 @@ class SavedDumpTestCase(unittest.TestCase):
 
 class EmptyDumpTestCase(unittest.TestCase):
     def test_empty_dump_has_base_entries(self):
-        dump = pgdumplib.new('test', 'UTF8')
-        self.assertEqual(len(dump.entries), 3)
+        dmp = pgdumplib.new('test', 'UTF8')
+        self.assertEqual(len(dmp.entries), 3)
 
     def test_empty_save_does_not_err(self):
-        dump = pgdumplib.new('test', 'UTF8')
-        dump.save('build/data/dump.test')
+        dmp = pgdumplib.new('test', 'UTF8')
+        dmp.save(pathlib.Path('build/data/dump.test'))
         test_file = pathlib.Path('build/data/dump.test')
         self.assertTrue(test_file.exists())
         test_file.unlink()
@@ -155,9 +160,10 @@ class CreateDumpTestCase(unittest.TestCase):
         with dmp.table_data_writer(example, columns) as writer:
             writer.append(*row)
 
-        dmp.save('build/data/dump.test')
-
         test_file = pathlib.Path('build/data/dump.test')
+
+        dmp.save(test_file)
+
         self.assertTrue(test_file.exists())
 
         dmp = pgdumplib.load(test_file, converters.SmartDataConverter)

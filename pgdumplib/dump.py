@@ -269,21 +269,22 @@ class Dump:
                 )
         self.entries.append(
             models.Entry(
-                dump_id or self._next_dump_id(),
-                False,
-                '',
-                '',
-                tag or '',
-                desc,
-                defn or '',
-                drop_stmt or '',
-                copy_stmt or '',
-                namespace or '',
-                tablespace or '',
-                tableam or '',
-                owner or '',
-                False,
-                dependencies or [],
+                dump_id=dump_id or self._next_dump_id(),
+                had_dumper=False,
+                table_oid='',
+                oid='',
+                tag=tag or '',
+                desc=desc,
+                defn=defn or '',
+                drop_stmt=drop_stmt or '',
+                copy_stmt=copy_stmt or '',
+                namespace=namespace or '',
+                tablespace=tablespace or '',
+                tableam=tableam or '',
+                relkind=None,
+                owner=owner or '',
+                with_oids=False,
+                dependencies=dependencies or [],
             )
         )
         return self.entries[-1]
@@ -344,7 +345,14 @@ class Dump:
                 'Unsupported backup version: {}.{}.{}'.format(*self.version)
             )
 
-        self.compression = self._read_int() != 0
+        # v1.15+ has compression algorithm in header, older versions have
+        # compression level as an int after the header
+        if self.version < (1, 15, 0):
+            self.compression = self._read_int() != 0
+        else:
+            # For v1.15+, compression was already read in _read_header
+            # 0 = no compression, 1+ = compressed (gzip, lz4, zstd)
+            self.compression = getattr(self, '_compression_algorithm', 0) > 0
         self.timestamp = self._read_timestamp()
         self.dbname = self._read_bytes().decode(self.encoding)
         self.server_version = self._read_bytes().decode(self.encoding)
@@ -645,6 +653,11 @@ class Dump:
             tableam = self._read_bytes().decode(self.encoding)
         else:
             tableam = ''
+        if self.version >= (1, 16, 0):
+            relkind_val = self._read_int()
+            relkind = chr(relkind_val) if relkind_val else None
+        else:
+            relkind = None
         owner = self._read_bytes().decode(self.encoding)
         with_oids = self._read_bytes() == b'true'
         dependencies = self._read_dependencies()
@@ -663,6 +676,7 @@ class Dump:
                 namespace=namespace,
                 tablespace=tablespace,
                 tableam=tableam,
+                relkind=relkind,
                 owner=owner,
                 with_oids=with_oids,
                 dependencies=dependencies,
@@ -690,6 +704,11 @@ class Dump:
         LOGGER.debug(
             'Archive version %i.%i.%i', self._vmaj, self._vmin, self._vrev
         )
+        # v1.15+ has compression_spec.algorithm byte
+        if (self._vmaj, self._vmin, self._vrev) >= (1, 15, 0):
+            self._compression_algorithm = struct.unpack(
+                'B', self._handle.read(1)
+            )[0]
 
     def _read_int(self) -> int | None:
         """Read in a signed integer
@@ -915,6 +934,11 @@ class Dump:
         if self.version >= (1, 14, 0):
             LOGGER.debug('Adding tableam')
             self._write_str(entry.tableam)
+        if self.version >= (1, 16, 0):
+            LOGGER.debug('Adding relkind')
+            # Write relkind as an int (character code)
+            relkind_val = ord(entry.relkind) if entry.relkind else 0
+            self._write_int(relkind_val)
         self._write_str(entry.owner)
         self._write_str('true' if entry.with_oids else 'false')
         for dependency in entry.dependencies or []:
@@ -937,6 +961,15 @@ class Dump:
         self._write_byte(self._intsize)
         self._write_byte(self._offsize)
         self._write_byte(constants.FORMATS.index(self._format))
+        # v1.15+ has compression algorithm in header
+        if self.version >= (1, 15, 0):
+            # Write compression algorithm: 0=none, 1=gzip, 2=lz4, 3=zstd
+            if self.compression:
+                # Use stored algorithm if available, otherwise default to gzip
+                comp_alg = getattr(self, '_compression_algorithm', 1)
+            else:
+                comp_alg = 0
+            self._write_byte(comp_alg)
 
     def _write_int(self, value: int) -> None:
         """Write an integer value
@@ -979,8 +1012,12 @@ class Dump:
             True,
         ):
             if dump_id not in saved:
-                self._write_entry(self.get_entry(dump_id))
-                saved.add(dump_id)
+                entry = self.get_entry(dump_id)
+                if entry:
+                    self._write_entry(entry)
+                    saved.add(dump_id)
+                else:
+                    LOGGER.warning('Entry %d not found, skipping', dump_id)
         return saved
 
     def _write_str(self, value: str) -> None:
@@ -1006,23 +1043,80 @@ class Dump:
         self._write_int(dump_id)
 
         writer = [w for w in self._writers.values() if w.dump_id == dump_id]
-        if writer:  # Data was added ad-hoc
+        if writer:  # Data was added ad-hoc, read from TableData writer
             writer[0].finish()
-            self._write_int(writer[0].size)
-            self._handle.write(writer[0].read())
-            self._write_int(0)  # End of data indicator
-            return writer[0].size
+            # writer.read() returns decompressed data (auto-decompressed)
+            data = writer[0].read()
 
-        # Data was cached on load
+            if self.compression:
+                # Re-compress with zlib and write in chunks
+                # Compress all data as a continuous stream
+                compressed_data = zlib.compress(data)
+
+                # Write compressed data in ZLIB_IN_SIZE chunks
+                total_size = 0
+                offset = 0
+                while offset < len(compressed_data):
+                    chunk_size = min(
+                        constants.ZLIB_IN_SIZE, len(compressed_data) - offset
+                    )
+                    self._write_int(chunk_size)
+                    self._handle.write(
+                        compressed_data[offset : offset + chunk_size]
+                    )
+                    total_size += chunk_size
+                    offset += chunk_size
+            else:
+                # Write uncompressed in chunks
+                total_size = 0
+                offset = 0
+                while offset < len(data):
+                    chunk_size = min(
+                        constants.ZLIB_IN_SIZE, len(data) - offset
+                    )
+                    self._write_int(chunk_size)
+                    self._handle.write(data[offset : offset + chunk_size])
+                    total_size += chunk_size
+                    offset += chunk_size
+            self._write_int(0)  # End of data indicator
+            return total_size
+
+        # Data was cached on load - read from tempfile and write
         with self._tempfile(dump_id, 'rb') as handle:
-            handle.seek(0, io.SEEK_END)  # Seek to end to figure out size
-            size = handle.tell()
-            self._write_int(size)
-            if size:
-                handle.seek(0)  # Rewind to read data
-                self._handle.write(handle.read())
+            # Read all decompressed data from the gzip temp file
+            data = handle.read()
+
+        if self.compression:
+            # Compress and write in chunks
+            # Compress all data as a continuous stream
+            compressed_data = zlib.compress(data)
+
+            # Write compressed data in ZLIB_IN_SIZE chunks
+            total_size = 0
+            offset = 0
+            while offset < len(compressed_data):
+                chunk_size = min(
+                    constants.ZLIB_IN_SIZE, len(compressed_data) - offset
+                )
+                self._write_int(chunk_size)
+                self._handle.write(
+                    compressed_data[offset : offset + chunk_size]
+                )
+                total_size += chunk_size
+                offset += chunk_size
+        else:
+            # Write uncompressed in chunks
+            total_size = 0
+            offset = 0
+            while offset < len(data):
+                chunk_size = min(constants.ZLIB_IN_SIZE, len(data) - offset)
+                self._write_int(chunk_size)
+                self._handle.write(data[offset : offset + chunk_size])
+                total_size += chunk_size
+                offset += chunk_size
+
         self._write_int(0)  # End of data indicator
-        return size
+        return total_size
 
     def _write_timestamp(self, value: datetime.datetime) -> None:
         """Write a datetime.datetime value
@@ -1042,7 +1136,9 @@ class Dump:
         """Write the ToC for the file"""
         self._handle.seek(0)
         self._write_header()
-        self._write_int(int(self.compression))
+        # v1.15+ has compression in header, older versions have it here
+        if self.version < (1, 15, 0):
+            self._write_int(int(self.compression))
         self._write_timestamp(self.timestamp)
         self._write_str(self.dbname)
         self._write_str(self.server_version)

@@ -1,82 +1,108 @@
 #!/usr/bin/env sh
+#
+# NAME
+#   bootstrap — bootstrap the project
+#
+# vim: set ts=4 sw=4 sts=4 noet:
+
+# NOTE THAT THIS FILE IS INDENTED WITH 4-SPACE HARD TABS
+# as is required for <<-EOF heredocs to work.  Please keep
+# it this way!
+
+# -- Start bootstrap setup --
 set -e
-
-# Common constants
-COLOR_RESET='\033[0m'
-COLOR_GREEN='\033[0;32m'
-COMPOSE_PROJECT_NAME="${COMPOSE_PROJECT_NAME:-${PWD##*/}}"
-TEST_HOST="${TEST_HOST:-localhost}"
-
-echo "Integration test host: ${TEST_HOST}"
-
-get_exposed_port() {
-  if [ -z $3 ]
-  then
-    docker compose port $1 $2 | cut -d: -f2
-  else
-    docker compose port --index=$3 $1 $2 | cut -d: -f2
-  fi
-}
-
-report_start() {
-  printf "Waiting for $1 ... "
-}
-
-report_done() {
-  printf "${COLOR_GREEN}done${COLOR_RESET}\n"
-}
-
-wait_for() {
-  printf 'Waiting for %s... ' $1
-    counter="0"
-    while true
-    do
-      if [ "$( docker compose ps | grep $1 | grep -c healthy )" -eq 1 ]; then
-        break
-      fi
-      counter=$((counter+1))
-      if [ "${counter}" -eq 120 ]; then
-        echo " ERROR: container failed to start"
-        exit 1
-      fi
-      sleep 1
-    done
-    echo 'done.'
-}
-
-# Ensure Docker is Running
-echo "Docker Information:"
-echo ""
-docker version
-echo ""
-
-# Activate the virtual environment
-if test -e env/bin/activate
+if test -n "$CI_DEBUG_TRACE" -o -n "$SHELLDEBUG"
 then
-  . ./env/bin/activate
+	set -x
 fi
 
-rm -rf build
-mkdir -p build build/data
+if test "${CI}" = 'true'
+then
+	echo "::group::Build logs"
+fi
 
-# Stop any running instances and clean up after them, then pull images
-docker compose down --volumes --remove-orphans
-docker compose up -d --quiet-pull
+unset PYTHONDEBUG
+export COMPOSE_DISABLE_ENV_FILE=1
+export PIP_DISABLE_PIP_VERSION_CHECK=1
+export PYTHON_ROOT_USER_ACTION=ignore
+export PYTHONWARNINGS=ignore
 
-wait_for postgres
+TEST_HOST=${TEST_HOST:-127.0.0.1}
 
-PGPORT=$(get_exposed_port postgres 5432)
+get_exposed_port() {
+	if test -f compose.yaml
+	then
+		if port=$(docker compose port "$1" --protocol "${3:-tcp}" "$2")
+		then
+			echo "${port#*:}"
+		else
+			echo "Failed to find port for $1:$2" >&2
+			return 1
+		fi
+	else
+		echo "Failed to find port for $1:$2 - compose.yaml not found" >&2
+		return 1
+	fi
+}
+
+if test "$CI" != 'true'
+then
+	if test -e ./.venv/bin/activate
+	then
+		. ./.venv/bin/activate
+	else
+		python3.12 -m venv --upgrade-deps .venv
+		. ./.venv/bin/activate
+	fi
+fi
+
+mkdir -p build
+
+pip install --upgrade pip
+
+printf 'Installing package...'
+pip install -e '.[dev]'
+echo ' done.'
+
+if test -d .git && test -f .pre-commit-config.yaml
+then
+	printf 'Installing pre-commit hook...'
+	pre-commit install --install-hooks
+	echo ' done.'
+fi
+
+printf 'Cleaning environment...'
+docker compose down --remove-orphans --volumes
+echo ' done.'
+
+printf 'Starting environment...'
+docker compose up --wait --wait-timeout 120
+echo ' done.'
+
+printf 'Generating .env...'
+cat > .env <<EOF
+export FILE_CACHE_ENABLED=no
+export TEST_HOST=${TEST_HOST}
+export PGHOST=${TEST_HOST}
+export PGPORT=$(get_exposed_port postgres 5432)
+export PGDATABASE=postgres
+export PGUSER=postgres
+export POSTGRES_URI=postgresql://postgres@${TEST_HOST}:$(get_exposed_port postgres 5432)/postgres
+EOF
+echo ' done.'
+
+source .env
 
 echo "Running pgbench ... "
 docker compose exec postgres /usr/bin/pgbench -i -U postgres postgres
 
 printf "Loading fixture schema ... "
 docker compose exec postgres /usr/bin/psql -U postgres -d postgres -q -o /dev/null -f /fixtures/schema.sql
-report_done
+echo ' done.'
 
 printf "Generating fixture data ... "
-python3 ci/generate-fixture-data.py -U postgres -h ${TEST_HOST} -p ${PGPORT} -d postgres
-report_done
+python3 ci/generate-fixture-data.py -U postgres -h "${TEST_HOST}" -p "${PGPORT}" -d postgres
+echo ' done.'
 
 printf "Creating test backups ... "
 docker compose exec postgres /usr/bin/pg_dump -Fc -U postgres -f /data/dump.not-compressed -d postgres --compress=0
@@ -84,18 +110,13 @@ docker compose exec postgres /usr/bin/pg_dump -Fc -U postgres -f /data/dump.comp
 docker compose exec postgres /usr/bin/pg_dump -Fc -U postgres -f /data/dump.no-data -d postgres --compress=0 -s
 docker compose exec postgres /usr/bin/pg_dump -Fc -U postgres -f /data/dump.data-only -d postgres --compress=0 -a
 docker compose exec postgres /usr/bin/pg_dump -Fc -U postgres -f /data/dump.inserts -d postgres --compress=0 --inserts
-report_done
+echo ' done.'
 
 printf "Fixing permissions ... "
 docker compose exec postgres chmod -R a+r /data
-report_done
+echo ' done.'
 
-cat > build/test-environment<<EOF
-export PGHOST=${TEST_HOST}
-export PGPORT=${PGPORT}
-export PGDATABASE=postgres
-export PGUSER=postgres
-export POSTGRES_URI=postgresql://postgres@${TEST_HOST}:${PGPORT}/postgres
-EOF
-
-printf "\nBootstrap complete\n\nDon't forget to \". build/test-environment\"\n"
+if test "${CI}" = 'true'
+then
+	echo '::endgroup::'
+fi

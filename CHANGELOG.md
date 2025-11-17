@@ -1,5 +1,12 @@
 # Changelog
 
+## 4.0.0 - 2025-11-17
+
+- Updates to support Postgres versions up to 18
+- Renamed `pgdumplib.exceptions.PgDumpLibException` to `pgdumplib.exceptions.PgDumpLibError`
+- Updated Python support to 3.11+
+- Modernized project structure
+
 ## 3.1.0 - 2020-02-06
 
 - Add configurable version support and appropriately set dump version based upon Postgres version
