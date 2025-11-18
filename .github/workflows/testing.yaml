@@ -44,8 +44,16 @@ jobs:
 
       - name: Setup environment
         run: |
+          # Add PostgreSQL APT repository for version-specific packages
           sudo apt-get update
-          sudo apt-get install -y bash cargo gcc git libffi-dev libpq-dev build-essential postgresql-client rustc tzdata
+          sudo apt-get install -y wget gnupg
+          sudo sh -c 'echo "deb https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list'
+          wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo apt-key add -
+          sudo apt-get update
+
+          # Install base packages and PostgreSQL client tools matching matrix version
+          sudo apt-get install -y bash cargo gcc git libffi-dev libpq-dev build-essential rustc tzdata
+          sudo apt-get install -y postgresql-client-${{ matrix.postgres }}
 
       - name: Install dependencies
         run: |
