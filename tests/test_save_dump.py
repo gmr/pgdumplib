@@ -57,26 +57,21 @@ class SavedDumpTestCase(unittest.TestCase):
             if self.original.entries[entry].desc != constants.TABLE_DATA:
                 continue
 
-            original_data = list(
-                self.original.table_data(
-                    self.original.entries[entry].namespace,
-                    self.original.entries[entry].tag,
-                )
-            )
+            # Type narrowing for namespace and tag
+            namespace = self.original.entries[entry].namespace
+            tag = self.original.entries[entry].tag
+            assert namespace is not None  # noqa: S101
+            assert tag is not None  # noqa: S101
 
-            saved_data = list(
-                self.saved.table_data(
-                    self.original.entries[entry].namespace,
-                    self.original.entries[entry].tag,
-                )
-            )
+            original_data = list(self.original.table_data(namespace, tag))
+
+            saved_data = list(self.saved.table_data(namespace, tag))
 
             for offset in range(0, len(original_data)):
                 self.assertListEqual(
                     list(original_data[offset]),
                     list(saved_data[offset]),
-                    f'Data in {self.original.entries[entry].namespace}.'
-                    f'{self.original.entries[entry].tag} does not match '
+                    f'Data in {namespace}.{tag} does not match '
                     f'for row {offset}',
                 )
 
@@ -168,6 +163,8 @@ class CreateDumpTestCase(unittest.TestCase):
 
         dmp = pgdumplib.load(test_file, converters.SmartDataConverter)
         entry = dmp.get_entry(database.dump_id)
+        self.assertIsNotNone(entry)
+        assert entry is not None  # noqa: S101 - Type narrowing for type checker
         self.assertEqual(entry.desc, 'DATABASE')
         self.assertEqual(entry.owner, 'postgres')
         self.assertEqual(entry.tag, 'postgres')

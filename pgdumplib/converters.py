@@ -17,6 +17,7 @@ Creating your own data converter is easy and should simply extend the
 import datetime
 import decimal
 import ipaddress
+import typing
 import uuid
 
 import pendulum
@@ -34,7 +35,7 @@ class DataConverter:
     """
 
     @staticmethod
-    def convert(row: str) -> tuple[str | None, ...]:
+    def convert(row: str) -> tuple[typing.Any, ...]:
         """Convert the string based row into a tuple of columns.
 
         :param str row: The row to convert
@@ -93,9 +94,12 @@ class SmartDataConverter(DataConverter):
 
     """
 
-    def convert(self, row: str) -> tuple[SmartColumn, ...]:
+    @staticmethod
+    def convert(row: str) -> tuple[SmartColumn, ...]:
         """Convert the string based row into a tuple of columns"""
-        return tuple(self._convert_column(c) for c in row.split('\t'))
+        return tuple(
+            SmartDataConverter._convert_column(c) for c in row.split('\t')
+        )
 
     @staticmethod
     def _convert_column(column: str) -> SmartColumn:

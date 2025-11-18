@@ -32,11 +32,12 @@ import pathlib
 import re
 import struct
 import tempfile
+import typing
 import zlib
 from collections.abc import Generator, Sequence
 from typing import Any, Self
 
-import toposort
+import toposort  # type: ignore[import-untyped]
 
 from pgdumplib import constants, converters, exceptions, models, version
 
@@ -45,12 +46,6 @@ LOGGER = logging.getLogger(__name__)
 ENCODING_PATTERN = re.compile(r"^.*=\s+'(.*)'")
 
 VERSION_INFO = '{} (pgdumplib {})'
-
-Converters = (
-    type[converters.DataConverter]
-    | type[converters.NoOpConverter]
-    | type[converters.SmartDataConverter]
-)
 
 
 class TableData:
@@ -142,7 +137,7 @@ class Dump:
         self,
         dbname: str = 'pgdumplib',
         encoding: str = 'UTF8',
-        converter: Converters | None = None,
+        converter: typing.Any = None,
         appear_as: str = '12.0',
     ):
         self.compression = False
@@ -176,13 +171,14 @@ class Dump:
         converter = converter or converters.DataConverter
         self._converter: converters.DataConverter = converter()
         self._format: str = 'Custom'
-        self._handle: io.BufferedWriter | None = None
+        self._handle: io.BufferedReader | io.BufferedWriter | None = None
         self._intsize: int = 4
         self._offsize: int = 8
         self._temp_dir = tempfile.TemporaryDirectory()
-        k_version = self._get_k_version(
-            tuple(int(v) for v in appear_as.split('.'))
-        )
+        parts = tuple(int(v) for v in appear_as.split('.'))
+        if len(parts) < 2:
+            raise ValueError(f'Invalid appear_as version: {appear_as}')
+        k_version = self._get_k_version(parts)
         self._vmaj: int = k_version[0]
         self._vmin: int = k_version[1]
         self._vrev: int = k_version[2]
@@ -323,7 +319,7 @@ class Dump:
                 return entry
         return None
 
-    def load(self, path: os.PathLike) -> Self:
+    def load(self, path: str | os.PathLike) -> Self:
         """Load the Dumpfile, including extracting all data into a temporary
         directory
 
@@ -378,7 +374,7 @@ class Dump:
             elif block_type == constants.BLK_BLOBS:
                 self._cache_blobs(dump_id)
             else:
-                raise RuntimeError(f'Unknown block type: {block_type}')
+                raise RuntimeError(f'Unknown block type: {block_type!r}')
         return self
 
     def lookup_entry(
@@ -401,14 +397,15 @@ class Dump:
                 return entry
         return None
 
-    def save(self, path: os.PathLike) -> None:
+    def save(self, path: str | os.PathLike) -> None:
         """Save the Dump file to the specified path
 
         :param os.PathLike path: The path to save the dump to
 
         """
-        if getattr(self, '_handle', None) and not self._handle.closed:
-            self._handle.close()
+        handle = getattr(self, '_handle', None)
+        if handle is not None and not handle.closed:
+            handle.close()
         self.compression = False
         self._handle = open(path, 'wb')
         self._save()
@@ -512,7 +509,7 @@ class Dump:
         return [e for e in self.entries if e.section == constants.SECTION_DATA]
 
     @staticmethod
-    def _get_k_version(appear_as: tuple[int, int]) -> tuple[int, int, int]:
+    def _get_k_version(appear_as: tuple[int, ...]) -> tuple[int, int, int]:
         for (min_ver, max_ver), value in constants.K_VERSION_MAP.items():
             if min_ver <= appear_as <= max_ver:
                 return value
@@ -547,6 +544,8 @@ class Dump:
         :rtype: bytes, int
 
         """
+        if self._handle is None:
+            raise ValueError('File handle is not initialized')
         return self._handle.read(1), self._read_int()
 
     def _read_byte(self) -> int | None:
@@ -555,6 +554,8 @@ class Dump:
         :rtype: int
 
         """
+        if self._handle is None:
+            raise ValueError('File handle is not initialized')
         try:
             return struct.unpack('B', self._handle.read(1))[0]
         except struct.error:
@@ -566,6 +567,8 @@ class Dump:
         :rtype: bytes
 
         """
+        if self._handle is None:
+            raise ValueError('File handle is not initialized')
         length = self._read_int()
         if length and length > 0:
             value = self._handle.read(length)
@@ -588,6 +591,8 @@ class Dump:
         :rtype: bytes
 
         """
+        if self._handle is None:
+            raise ValueError('File handle is not initialized')
         buffer = io.BytesIO()
         chunk = b''
         decompress = zlib.decompressobj()
@@ -608,6 +613,8 @@ class Dump:
         :rtype: bytes
 
         """
+        if self._handle is None:
+            raise ValueError('File handle is not initialized')
         buffer = io.BytesIO()
         while True:
             block_length = self._read_int()
@@ -638,6 +645,8 @@ class Dump:
     def _read_entry(self) -> None:
         """Read in an individual entry and append it to the entries stack"""
         dump_id = self._read_int()
+        if dump_id is None:
+            raise ValueError('dump_id cannot be None')
         had_dumper = bool(self._read_int())
         table_oid = self._read_bytes().decode(self.encoding)
         oid = self._read_bytes().decode(self.encoding)
@@ -691,6 +700,8 @@ class Dump:
         :raises: ValueError
 
         """
+        if self._handle is None:
+            raise ValueError('File handle is not initialized')
         if self._handle.read(5) != constants.MAGIC:
             raise ValueError('Invalid archive header')
         self._vmaj = struct.unpack('B', self._handle.read(1))[0]
@@ -763,10 +774,10 @@ class Dump:
 
         """
         second, minute, hour, day, month, year = (
-            self._read_int(),
-            self._read_int(),
-            self._read_int(),
-            self._read_int(),
+            self._read_int() or 0,
+            self._read_int() or 0,
+            self._read_int() or 0,
+            self._read_int() or 0,
             (self._read_int() or 0) + 1,
             (self._read_int() or 0) + 1900,
         )
@@ -789,7 +800,7 @@ class Dump:
 
         """
         for entry in self.entries:
-            if entry.desc == constants.ENCODING:
+            if entry.desc == constants.ENCODING and entry.defn:
                 match = ENCODING_PATTERN.match(entry.defn)
                 if match:
                     self.encoding = match.group(1)
@@ -798,7 +809,7 @@ class Dump:
     @contextlib.contextmanager
     def _tempfile(
         self, dump_id: int, mode: str
-    ) -> Generator[io.BufferedReader, None, None]:
+    ) -> Generator[typing.Any, None, None]:
         """Open the temp file for the specified dump_id in the specified mode
 
         :param int dump_id: The dump_id for the temp file
@@ -821,6 +832,9 @@ class Dump:
         :rtype: int
 
         """
+        if self._handle is None:
+            raise ValueError('File handle is not initialized')
+        length = 0
         with self._tempfile(dump_id, 'rb') as handle:
             self._handle.write(constants.BLK_BLOBS)
             self._write_int(dump_id)
@@ -843,10 +857,14 @@ class Dump:
         :param int value: The byte value
 
         """
+        if self._handle is None:
+            raise ValueError('File handle is not initialized')
         self._handle.write(struct.pack('B', value))
 
     def _write_data(self) -> set[int]:
         """Write the data blocks, returning a set of IDs that were written"""
+        if self._handle is None:
+            raise ValueError('File handle is not initialized')
         saved = set({})
         for offset, entry in enumerate(self.entries):
             if entry.section != constants.SECTION_DATA:
@@ -948,6 +966,8 @@ class Dump:
 
     def _write_header(self) -> None:
         """Write the file header"""
+        if self._handle is None:
+            raise ValueError('File handle is not initialized')
         LOGGER.debug(
             'Writing archive version %i.%i.%i',
             self._vmaj,
@@ -977,6 +997,8 @@ class Dump:
         :param int value:
 
         """
+        if self._handle is None:
+            raise ValueError('File handle is not initialized')
         self._write_byte(1 if value < 0 else 0)
         if value < 0:
             value = -value
@@ -1012,20 +1034,22 @@ class Dump:
             True,
         ):
             if dump_id not in saved:
-                entry = self.get_entry(dump_id)
-                if entry:
-                    self._write_entry(entry)
+                found_entry: models.Entry | None = self.get_entry(dump_id)
+                if found_entry:
+                    self._write_entry(found_entry)
                     saved.add(dump_id)
                 else:
                     LOGGER.warning('Entry %d not found, skipping', dump_id)
         return saved
 
-    def _write_str(self, value: str) -> None:
+    def _write_str(self, value: str | None) -> None:
         """Write a string
 
         :param str value: The string to write
 
         """
+        if self._handle is None:
+            raise ValueError('File handle is not initialized')
         out = value.encode(self.encoding) if value else b''
         self._write_int(len(out))
         if out:
@@ -1039,6 +1063,8 @@ class Dump:
         :rtype: int
 
         """
+        if self._handle is None:
+            raise ValueError('File handle is not initialized')
         self._handle.write(constants.BLK_DATA)
         self._write_int(dump_id)
 
@@ -1124,6 +1150,8 @@ class Dump:
         :param datetime.datetime value: The value to write
 
         """
+        if self._handle is None:
+            raise ValueError('File handle is not initialized')
         self._write_int(value.second)
         self._write_int(value.minute)
         self._write_int(value.hour)
@@ -1134,6 +1162,8 @@ class Dump:
 
     def _write_toc(self) -> None:
         """Write the ToC for the file"""
+        if self._handle is None:
+            raise ValueError('File handle is not initialized')
         self._handle.seek(0)
         self._write_header()
         # v1.15+ has compression in header, older versions have it here
