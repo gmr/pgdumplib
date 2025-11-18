@@ -32,7 +32,7 @@ TEST_HOST=${TEST_HOST:-127.0.0.1}
 docker_exec() {
 	if test "${CI}" = 'true'
 	then
-		docker exec -t
+		docker exec -t postgres "$@"
 	else
 		docker compose exec postgres "$@"
 	fi
@@ -80,7 +80,7 @@ then
 	echo ' done.'
 fi
 
-if test "${CI}" = 'true'
+if test "${CI}" != 'true'
 then
 	printf 'Cleaning environment...'
 	docker compose down --remove-orphans --volumes

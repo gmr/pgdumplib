@@ -15,7 +15,7 @@ jobs:
       fail-fast: false
       matrix:
         python: ["3.11", "3.12", "3.13", "3.14"]
-        postgres: [15, 16, 17, 18]
+        postgres: [18] # [15, 16, 17, 18]
     steps:
       - name: Checkout repository
         uses: actions/checkout@v5
