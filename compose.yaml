@@ -1,4 +1,97 @@
 services:
+  postgres-15:
+    image: postgres:15
+    healthcheck:
+      test: /usr/bin/pg_isready
+      interval: 30s
+      timeout: 10s
+      start_period: 5s
+      start_interval: 2s
+      retries: 3
+    environment:
+      POSTGRES_HOST_AUTH_METHOD: trust
+    ports:
+      - "5432"
+    volumes:
+      - type: bind
+        source: ./build/data
+        target: /data
+      - type: bind
+        source: ./fixtures
+        target: /fixtures
+    profiles:
+      - pg15
+
+  postgres-16:
+    image: postgres:16
+    healthcheck:
+      test: /usr/bin/pg_isready
+      interval: 30s
+      timeout: 10s
+      start_period: 5s
+      start_interval: 2s
+      retries: 3
+    environment:
+      POSTGRES_HOST_AUTH_METHOD: trust
+    ports:
+      - "5432"
+    volumes:
+      - type: bind
+        source: ./build/data
+        target: /data
+      - type: bind
+        source: ./fixtures
+        target: /fixtures
+    profiles:
+      - pg16
+
+  postgres-17:
+    image: postgres:17
+    healthcheck:
+      test: /usr/bin/pg_isready
+      interval: 30s
+      timeout: 10s
+      start_period: 5s
+      start_interval: 2s
+      retries: 3
+    environment:
+      POSTGRES_HOST_AUTH_METHOD: trust
+    ports:
+      - "5432"
+    volumes:
+      - type: bind
+        source: ./build/data
+        target: /data
+      - type: bind
+        source: ./fixtures
+        target: /fixtures
+    profiles:
+      - pg17
+
+  postgres-18:
+    image: postgres:18
+    healthcheck:
+      test: /usr/bin/pg_isready
+      interval: 30s
+      timeout: 10s
+      start_period: 5s
+      start_interval: 2s
+      retries: 3
+    environment:
+      POSTGRES_HOST_AUTH_METHOD: trust
+    ports:
+      - "5432"
+    volumes:
+      - type: bind
+        source: ./build/data
+        target: /data
+      - type: bind
+        source: ./fixtures
+        target: /fixtures
+    profiles:
+      - pg18
+
+  # Default service without profile for backward compatibility
   postgres:
     image: postgres:18
     healthcheck:

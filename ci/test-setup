@@ -46,21 +46,14 @@ else
   # If running in CI, copy dump files from container to host
   if [ -n "$CI" ]; then
     echo "Copying dump files from container to host..."
-    docker cp $CONTAINER:/tmp/dump.not-compressed build/data/dump.not-compressed
-    docker cp $CONTAINER:/tmp/dump.compressed build/data/dump.compressed
-    docker cp $CONTAINER:/tmp/dump.no-data build/data/dump.no-data
-    docker cp $CONTAINER:/tmp/dump.data-only build/data/dump.data-only
-    docker cp $CONTAINER:/tmp/dump.inserts build/data/dump.inserts
+    docker cp "${CONTAINER}":/tmp/dump.not-compressed build/data/dump.not-compressed
+    docker cp "${CONTAINER}":/tmp/dump.compressed build/data/dump.compressed
+    docker cp "${CONTAINER}":/tmp/dump.no-data build/data/dump.no-data
+    docker cp "${CONTAINER}":/tmp/dump.data-only build/data/dump.data-only
+    docker cp "${CONTAINER}":/tmp/dump.inserts build/data/dump.inserts
   fi
 fi
-cat > build/test-environment<<EOF
-export PGDATABASE=postgres
-export PGPASSWORD=postgres
-export PGUSER=postgres
-export POSTGRES_URI=postgresql://postgres:postgres@localhost:5432/postgres
-EOF
 
-# Also create .env file for dotenv loading in tests
 cat > .env<<EOF
 PGDATABASE=postgres
 PGPASSWORD=postgres

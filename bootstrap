@@ -28,6 +28,12 @@ export PYTHON_ROOT_USER_ACTION=ignore
 export PYTHONWARNINGS=ignore
 
 TEST_HOST=${TEST_HOST:-127.0.0.1}
+POSTGRES_VERSION=${POSTGRES_VERSION:-18}
+COMPOSE_PROFILES="pg${POSTGRES_VERSION}"
+export COMPOSE_PROFILES
+
+# Set service name based on version
+POSTGRES_SERVICE="postgres-${POSTGRES_VERSION}"
 
 get_exposed_port() {
 	if test -f compose.yaml
@@ -84,20 +90,20 @@ cat > .env <<EOF
 export FILE_CACHE_ENABLED=no
 export TEST_HOST=${TEST_HOST}
 export PGHOST=${TEST_HOST}
-export PGPORT=$(get_exposed_port postgres 5432)
+export PGPORT=$(get_exposed_port ${POSTGRES_SERVICE} 5432)
 export PGDATABASE=postgres
 export PGUSER=postgres
-export POSTGRES_URI=postgresql://postgres@${TEST_HOST}:$(get_exposed_port postgres 5432)/postgres
+export POSTGRES_URI=postgresql://postgres@${TEST_HOST}:$(get_exposed_port ${POSTGRES_SERVICE} 5432)/postgres
 EOF
 echo ' done.'
 
 source .env
 
 echo "Running pgbench ... "
-docker compose exec postgres /usr/bin/pgbench -i -U postgres postgres
+docker compose exec ${POSTGRES_SERVICE} /usr/bin/pgbench -i -U postgres postgres
 
 printf "Loading fixture schema ... "
-docker compose exec postgres /usr/bin/psql -U postgres -d postgres -q -o /dev/null -f /fixtures/schema.sql
+docker compose exec ${POSTGRES_SERVICE} /usr/bin/psql -U postgres -d postgres -q -o /dev/null -f /fixtures/schema.sql
 echo ' done.'
 
 printf "Generating fixture data ... "
@@ -105,15 +111,15 @@ python3 ci/generate-fixture-data.py -U postgres -h "${TEST_HOST}" -p "${PGPORT}"
 echo ' done.'
 
 printf "Creating test backups ... "
-docker compose exec postgres /usr/bin/pg_dump -Fc -U postgres -f /data/dump.not-compressed -d postgres --compress=0
-docker compose exec postgres /usr/bin/pg_dump -Fc -U postgres -f /data/dump.compressed -d postgres --compress=9
-docker compose exec postgres /usr/bin/pg_dump -Fc -U postgres -f /data/dump.no-data -d postgres --compress=0 -s
-docker compose exec postgres /usr/bin/pg_dump -Fc -U postgres -f /data/dump.data-only -d postgres --compress=0 -a
-docker compose exec postgres /usr/bin/pg_dump -Fc -U postgres -f /data/dump.inserts -d postgres --compress=0 --inserts
+docker compose exec ${POSTGRES_SERVICE} /usr/bin/pg_dump -Fc -U postgres -f /data/dump.not-compressed -d postgres --compress=0
+docker compose exec ${POSTGRES_SERVICE} /usr/bin/pg_dump -Fc -U postgres -f /data/dump.compressed -d postgres --compress=9
+docker compose exec ${POSTGRES_SERVICE} /usr/bin/pg_dump -Fc -U postgres -f /data/dump.no-data -d postgres --compress=0 -s
+docker compose exec ${POSTGRES_SERVICE} /usr/bin/pg_dump -Fc -U postgres -f /data/dump.data-only -d postgres --compress=0 -a
+docker compose exec ${POSTGRES_SERVICE} /usr/bin/pg_dump -Fc -U postgres -f /data/dump.inserts -d postgres --compress=0 --inserts
 echo ' done.'
 
 printf "Fixing permissions ... "
-docker compose exec postgres chmod -R a+r /data
+docker compose exec ${POSTGRES_SERVICE} chmod -R a+r /data
 echo ' done.'
 
 if test "${CI}" = 'true'
