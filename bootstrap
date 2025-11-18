@@ -97,7 +97,7 @@ export POSTGRES_URI=postgresql://postgres@${TEST_HOST}:$(get_exposed_port ${POST
 EOF
 echo ' done.'
 
-source .env
+. .env
 
 echo "Running pgbench ... "
 docker compose exec ${POSTGRES_SERVICE} /usr/bin/pgbench -i -U postgres postgres
