@@ -36,8 +36,12 @@ class SavedDumpTestCase(unittest.TestCase):
         self.assertEqual(self.original.version, self.saved.version)
 
     def test_compression_does_not_match(self):
-        self.assertTrue(self.original.compression)
-        self.assertFalse(self.saved.compression)
+        self.assertNotEqual(
+            self.original.compression_algorithm, constants.COMPRESSION_NONE
+        )
+        self.assertEqual(
+            self.saved.compression_algorithm, constants.COMPRESSION_NONE
+        )
 
     def test_entries_mostly_match(self):
         attrs = [e.name for e in dataclasses.fields(models.Entry)]

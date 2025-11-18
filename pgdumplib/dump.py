@@ -139,7 +139,7 @@ class Dump:
         converter: typing.Any = None,
         appear_as: str = '12.0',
     ):
-        self.compression = False
+        self.compression_algorithm = constants.COMPRESSION_NONE
         self.dbname = dbname
         self.dump_version = VERSION_INFO.format(appear_as, version)
         self.encoding = encoding
@@ -341,14 +341,24 @@ class Dump:
             )
 
         if self.version >= (1, 15, 0):
-            self.compression_algorithm = constants.COMPRESSION_ALGORITHMS[self._read_byte()]
+            self.compression_algorithm = constants.COMPRESSION_ALGORITHMS[
+                self._compression_algorithm
+            ]
 
-            if self.compression_algorithm not in constants.SUPPORTED_COMPRESSION_ALGORITHMS:
+            if (
+                self.compression_algorithm
+                not in constants.SUPPORTED_COMPRESSION_ALGORITHMS
+            ):
                 raise ValueError(
-                    'Unsupported compression algorithm: {}'.format(*self.compression_algorithm))
+                    'Unsupported compression algorithm: {}'.format(
+                        *self.compression_algorithm
+                    )
+                )
         else:
             self.compression_algorithm = (
-                constants.COMPRESSION_GZIP if self._read_int() != 0 else constants.COMPRESSION_NONE
+                constants.COMPRESSION_GZIP
+                if self._read_int() != 0
+                else constants.COMPRESSION_NONE
             )
 
         self.timestamp = self._read_timestamp()
@@ -360,7 +370,7 @@ class Dump:
         self._set_encoding()
 
         # Cache table data and blobs
-        last_pos = self._handle.tell()
+        _last_pos = self._handle.tell()
 
         for entry in self._data_entries:
             if entry.data_state == constants.K_OFFSET_NO_DATA:
@@ -989,11 +999,9 @@ class Dump:
         # v1.15+ has compression algorithm in header
         if self.version >= (1, 15, 0):
             # Write compression algorithm: 0=none, 1=gzip, 2=lz4, 3=zstd
-            if self.compression:
-                # Use stored algorithm if available, otherwise default to gzip
-                comp_alg = getattr(self, '_compression_algorithm', 1)
-            else:
-                comp_alg = 0
+            comp_alg = constants.COMPRESSION_ALGORITHMS.index(
+                self.compression_algorithm
+            )
             self._write_byte(comp_alg)
 
     def _write_int(self, value: int) -> None:
@@ -1079,7 +1087,7 @@ class Dump:
             # writer.read() returns decompressed data (auto-decompressed)
             data = writer[0].read()
 
-            if self.compression:
+            if self.compression_algorithm != constants.COMPRESSION_NONE:
                 # Re-compress with zlib and write in chunks
                 # Compress all data as a continuous stream
                 compressed_data = zlib.compress(data)
@@ -1117,7 +1125,7 @@ class Dump:
             # Read all decompressed data from the gzip temp file
             data = handle.read()
 
-        if self.compression:
+        if self.compression_algorithm != constants.COMPRESSION_NONE:
             # Compress and write in chunks
             # Compress all data as a continuous stream
             compressed_data = zlib.compress(data)
@@ -1171,11 +1179,11 @@ class Dump:
             raise ValueError('File handle is not initialized')
         self._handle.seek(0)
         self._write_header()
-
-        if self.version >= (1, 15, 0):
-            self._write_byte(constants.COMPRESSION_ALGORITHMS.index(self.compression_algorithm))
-        else:
-            self._write_int(int(self.compression_algorithm != constants.COMPRESSION_NONE))
+        # v1.15+ has compression in header, older versions have it here
+        if self.version < (1, 15, 0):
+            self._write_int(
+                int(self.compression_algorithm != constants.COMPRESSION_NONE)
+            )
 
         self._write_timestamp(self.timestamp)
         self._write_str(self.dbname)

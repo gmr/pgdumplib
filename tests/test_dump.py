@@ -257,7 +257,10 @@ class RestoreComparisonTestCase(unittest.TestCase):
         self.assertIsNotNone(self.dump)
 
     def test_toc_compression(self):
-        self.assertEqual(self.dump.compression, self.info.compression)
+        self.assertEqual(
+            self.dump.compression_algorithm != constants.COMPRESSION_NONE,
+            self.info.compression,
+        )
 
     def test_toc_dbname(self):
         self.assertEqual(self.dump.dbname, 'postgres')
