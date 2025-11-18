@@ -27,7 +27,7 @@ jobs:
       fail-fast: true
       matrix:
         python: ["3.11", "3.12", "3.13", "3.14"]
-        postgres: [16]
+        postgres: [16, 17, 18]
     steps:
       - name: Checkout repository
         uses: actions/checkout@v1
@@ -45,7 +45,7 @@ jobs:
       - name: Setup environment
         run: |
           sudo apt-get update
-          sudo apt-get install -y bash cargo gcc git libffi-dev libpq-dev build-essential postgresql postgresql-server-dev-16 rustc tzdata
+          sudo apt-get install -y bash cargo gcc git libffi-dev libpq-dev build-essential postgresql-client rustc tzdata
 
       - name: Install dependencies
         run: |
@@ -54,6 +54,8 @@ jobs:
 
       - name: Setup test/fixture data
         run: ci/test-setup
+        env:
+          POSTGRES_VERSION: ${{ matrix.postgres }}
 
       - name: Run tests
         run: ci/test
