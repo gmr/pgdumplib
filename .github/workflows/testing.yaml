@@ -27,13 +27,6 @@ jobs:
           --health-timeout 5s
           --health-retries 5
           --name postgres
-        volumes:
-          - type: bind
-            source: ${{ github.workspace }}/build/data
-            target: /data
-          - type: bind
-            source: ${{ github.workspace }}/fixtures
-            target: /fixtures
 
     steps:
       - name: Checkout repository
@@ -49,15 +42,32 @@ jobs:
         with:
           timezoneLinux: "America/New_York"
 
+      - name: Prepare container directories and copy fixtures
+        run: |
+          # Create directories inside the container
+          docker exec postgres mkdir -p /data /fixtures
+          docker exec postgres chmod 777 /data
+
+          # Create local build directory
+          mkdir -p build/data
+
+          # Copy fixtures into container
+          docker cp fixtures/. postgres:/fixtures/
+
       - name: Bootstrap environment
         run: ./bootstrap
         env:
           CI: true
 
+      - name: Copy dumps from container to workspace
+        run: |
+          # Copy generated dump files back to workspace for tests
+          docker cp postgres:/data/. build/data/
+
       - name: Lint Check
         run: pre-commit run --all-files
-      - name: Run tests
 
+      - name: Run tests
         run: |
           coverage run
           coverage report
