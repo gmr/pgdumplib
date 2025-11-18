@@ -59,3 +59,11 @@ export PGPASSWORD=postgres
 export PGUSER=postgres
 export POSTGRES_URI=postgresql://postgres:postgres@localhost:5432/postgres
 EOF
+
+# Also create .env file for dotenv loading in tests
+cat > .env<<EOF
+PGDATABASE=postgres
+PGPASSWORD=postgres
+PGUSER=postgres
+POSTGRES_URI=postgresql://postgres:postgres@localhost:5432/postgres
+EOF
