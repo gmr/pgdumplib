@@ -340,14 +340,17 @@ class Dump:
                 'Unsupported backup version: {}.{}.{}'.format(*self.version)
             )
 
-        # v1.15+ has compression algorithm in header, older versions have
-        # compression level as an int after the header
-        if self.version < (1, 15, 0):
-            self.compression = self._read_int() != 0
+        if self.version >= (1, 15, 0):
+            self.compression_algorithm = constants.COMPRESSION_ALGORITHMS[self._read_byte()]
+
+            if self.compression_algorithm not in constants.SUPPORTED_COMPRESSION_ALGORITHMS:
+                raise ValueError(
+                    'Unsupported compression algorithm: {}'.format(*self.compression_algorithm))
         else:
-            # For v1.15+, compression was already read in _read_header
-            # 0 = no compression, 1+ = compressed (gzip, lz4, zstd)
-            self.compression = getattr(self, '_compression_algorithm', 0) > 0
+            self.compression_algorithm = (
+                constants.COMPRESSION_GZIP if self._read_int() != 0 else constants.COMPRESSION_NONE
+            )
+
         self.timestamp = self._read_timestamp()
         self.dbname = self._read_bytes().decode(self.encoding)
         self.server_version = self._read_bytes().decode(self.encoding)
@@ -357,6 +360,8 @@ class Dump:
         self._set_encoding()
 
         # Cache table data and blobs
+        last_pos = self._handle.tell()
+
         for entry in self._data_entries:
             if entry.data_state == constants.K_OFFSET_NO_DATA:
                 continue
@@ -402,10 +407,9 @@ class Dump:
         :param os.PathLike path: The path to save the dump to
 
         """
-        handle = getattr(self, '_handle', None)
-        if handle is not None and not handle.closed:
-            handle.close()
-        self.compression = False
+        if getattr(self, '_handle', None) and not self._handle.closed:
+            self._handle.close()
+        self.compression_algorithm = constants.COMPRESSION_NONE
         self._handle = open(path, 'wb')
         self._save()
         self._handle.close()
@@ -580,7 +584,7 @@ class Dump:
         :rtype: bytes
 
         """
-        if self.compression:
+        if self.compression_algorithm != constants.COMPRESSION_NONE:
             return self._read_data_compressed()
         return self._read_data_uncompressed()
 
@@ -1167,9 +1171,12 @@ class Dump:
             raise ValueError('File handle is not initialized')
         self._handle.seek(0)
         self._write_header()
-        # v1.15+ has compression in header, older versions have it here
-        if self.version < (1, 15, 0):
-            self._write_int(int(self.compression))
+
+        if self.version >= (1, 15, 0):
+            self._write_byte(constants.COMPRESSION_ALGORITHMS.index(self.compression_algorithm))
+        else:
+            self._write_int(int(self.compression_algorithm != constants.COMPRESSION_NONE))
+
         self._write_timestamp(self.timestamp)
         self._write_str(self.dbname)
         self._write_str(self.server_version)

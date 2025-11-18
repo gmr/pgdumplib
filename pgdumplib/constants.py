@@ -27,6 +27,22 @@ FORMAT_DIRECTORY: int = 5
 
 FORMATS: list[str] = ['Unknown', 'Custom', 'Files', 'Tar', 'Null', 'Directory']
 
+"""Specifies the compression algorithm used"""
+COMPRESSION_NONE: str = 'none'
+COMPRESSION_GZIP: str = 'gzip'
+COMPRESSION_LZ4: str = 'lz4'
+COMPRESSION_ZSTD: str = 'zstd'
+COMPRESSION_ALGORITHMS: list[str] = [
+    COMPRESSION_NONE,
+    COMPRESSION_GZIP,
+    COMPRESSION_LZ4,
+    COMPRESSION_ZSTD
+]
+SUPPORTED_COMPRESSION_ALGORITHMS: list[str] = [
+    COMPRESSION_NONE,
+    COMPRESSION_GZIP,
+]
+
 K_OFFSET_POS_NOT_SET: int = 1
 """Specifies the entry has data but no offset"""
 K_OFFSET_POS_SET: int = 2
