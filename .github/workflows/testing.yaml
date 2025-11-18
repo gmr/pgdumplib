@@ -8,6 +8,10 @@ on:
       - '*.md'
       - '*.rst'
     tags-ignore: ["*"]
+
+env:
+  TEST_HOST: postgres
+
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -27,6 +31,7 @@ jobs:
           --health-timeout 5s
           --health-retries 5
           --name postgres
+          --hostname postgres
 
     steps:
       - name: Checkout repository

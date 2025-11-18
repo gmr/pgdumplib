@@ -13,14 +13,13 @@ import unittest
 import uuid
 from unittest import mock
 
+import dotenv
 import psycopg
-from dotenv import load_dotenv
 
 import pgdumplib
 from pgdumplib import constants, converters, dump, exceptions
 
-# Load environment variables from .env file
-load_dotenv()
+dotenv.load_dotenv()
 
 LOGGER = logging.getLogger(__name__)
 
