@@ -27,6 +27,13 @@ jobs:
           --health-timeout 5s
           --health-retries 5
           --name postgres
+        volumes:
+          - type: bind
+            source: ${{ github.workspace }}/build/data
+            target: /data
+          - type: bind
+            source: ${{ github.workspace }}/fixtures
+            target: /fixtures
 
     steps:
       - name: Checkout repository
