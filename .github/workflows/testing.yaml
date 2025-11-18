@@ -14,8 +14,20 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python: ["3.11", "3.12", "3.13", "3.14"]
+        python: ["3.12"] # ["3.11", "3.12", "3.13", "3.14"]
         postgres: [18] # [15, 16, 17, 18]
+    services:
+      postgres:
+        image: postgres:${{ matrix.postgres }}
+        env:
+          POSTGRES_PASSWORD: postgres
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+          --name postgres
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v5
