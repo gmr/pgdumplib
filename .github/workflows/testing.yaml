@@ -15,13 +15,13 @@ jobs:
       fail-fast: false
       matrix:
         python: ["3.11", "3.12", "3.13", "3.14"]
-        postgres: [16, 17, 18]
+        postgres: [15, 16, 17, 18]
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: '${{ matrix.python }}'
 
@@ -30,13 +30,22 @@ jobs:
         with:
           timezoneLinux: "America/New_York"
 
-      - name: Bootstrap environment and run tests
-        run: ./bootstrap && ci/test
+      - name: Bootstrap environment
+        run: ./bootstrap
         env:
           CI: true
-          POSTGRES_VERSION: ${{ matrix.postgres }}
+
+      - name: Lint Check
+        run: pre-commit run --all-files
+      - name: Run tests
+
+        run: |
+          coverage run
+          coverage report
+          coverage xml
 
       - name: Upload Coverage
-        uses: codecov/codecov-action@v4
+        uses: codecov/codecov-action@v5
         with:
-          file: build/coverage.xml
+          files: ./build/coverage.xml
+          flags: unittests

@@ -1,26 +1,7 @@
 #!/usr/bin/env sh
 set -e
+./bootstrap
 
-export PIP_DISABLE_PIP_VERSION_CHECK=1
-export PIP_ROOT_USER_ACTION=ignore
-unset PYTHONDEVMODE
-unset PYTHONASYNCIODEBUG
-unset PYTHONWARNINGS
-
-if test -e ./env/bin/activate
-then
-    . ./env/bin/activate
-fi
-
-if test -z "$NOBOOTSTRAP"
-then
-    ./bootstrap
-fi
-
-if ! command -v pre-commit >/dev/null
-then
-    python3 -m pip install pre-commit
-fi
 
 echo '
 LINTING

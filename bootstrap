@@ -28,12 +28,15 @@ export PYTHON_ROOT_USER_ACTION=ignore
 export PYTHONWARNINGS=ignore
 
 TEST_HOST=${TEST_HOST:-127.0.0.1}
-POSTGRES_VERSION=${POSTGRES_VERSION:-18}
-COMPOSE_PROFILES="pg${POSTGRES_VERSION}"
-export COMPOSE_PROFILES
 
-# Set service name based on version
-POSTGRES_SERVICE="postgres-${POSTGRES_VERSION}"
+docker_exec() {
+	if test "${CI}" = 'true'
+	then
+		docker exec -t
+	else
+		docker compose exec postgres "$@"
+	fi
+}
 
 get_exposed_port() {
 	if test -f compose.yaml
@@ -77,49 +80,57 @@ then
 	echo ' done.'
 fi
 
-printf 'Cleaning environment...'
-docker compose down --remove-orphans --volumes
-echo ' done.'
+if test "${CI}" = 'true'
+then
+	printf 'Cleaning environment...'
+	docker compose down --remove-orphans --volumes
+	echo ' done.'
 
-printf 'Starting environment...'
-docker compose up --wait --wait-timeout 120
-echo ' done.'
+	printf 'Starting environment...'
+	docker compose up --wait --wait-timeout 120
+	echo ' done.'
+fi
+
+if test "${CI}" = 'true'
+then
+	PGPORT=5432
+else
+	PGPORT="$(get_exposed_port postgres 5432)"
+fi
 
 printf 'Generating .env...'
 cat > .env <<EOF
 export FILE_CACHE_ENABLED=no
 export TEST_HOST=${TEST_HOST}
 export PGHOST=${TEST_HOST}
-export PGPORT=$(get_exposed_port ${POSTGRES_SERVICE} 5432)
+export PGPORT=${PGPORT}
 export PGDATABASE=postgres
 export PGUSER=postgres
-export POSTGRES_URI=postgresql://postgres@${TEST_HOST}:$(get_exposed_port ${POSTGRES_SERVICE} 5432)/postgres
+export POSTGRES_URI=postgresql://postgres@${TEST_HOST}:${PGPORT}/postgres
 EOF
 echo ' done.'
 
-. .env
-
 echo "Running pgbench ... "
-docker compose exec ${POSTGRES_SERVICE} /usr/bin/pgbench -i -U postgres postgres
+docker_exec /usr/bin/pgbench -i -U postgres postgres
 
 printf "Loading fixture schema ... "
-docker compose exec ${POSTGRES_SERVICE} /usr/bin/psql -U postgres -d postgres -q -o /dev/null -f /fixtures/schema.sql
+docker_exec /usr/bin/psql -U postgres -d postgres -q -o /dev/null -f /fixtures/schema.sql
 echo ' done.'
 
 printf "Generating fixture data ... "
-python3 ci/generate-fixture-data.py -U postgres -h "${TEST_HOST}" -p "${PGPORT}" -d postgres
+python3 bin/generate-fixture-data.py -U postgres -h "${TEST_HOST}" -p "${PGPORT}" -d postgres
 echo ' done.'
 
 printf "Creating test backups ... "
-docker compose exec ${POSTGRES_SERVICE} /usr/bin/pg_dump -Fc -U postgres -f /data/dump.not-compressed -d postgres --compress=0
-docker compose exec ${POSTGRES_SERVICE} /usr/bin/pg_dump -Fc -U postgres -f /data/dump.compressed -d postgres --compress=9
-docker compose exec ${POSTGRES_SERVICE} /usr/bin/pg_dump -Fc -U postgres -f /data/dump.no-data -d postgres --compress=0 -s
-docker compose exec ${POSTGRES_SERVICE} /usr/bin/pg_dump -Fc -U postgres -f /data/dump.data-only -d postgres --compress=0 -a
-docker compose exec ${POSTGRES_SERVICE} /usr/bin/pg_dump -Fc -U postgres -f /data/dump.inserts -d postgres --compress=0 --inserts
+docker_exec /usr/bin/pg_dump -Fc -U postgres -f /data/dump.not-compressed -d postgres --compress=0
+docker_exec /usr/bin/pg_dump -Fc -U postgres -f /data/dump.compressed -d postgres --compress=9
+docker_exec /usr/bin/pg_dump -Fc -U postgres -f /data/dump.no-data -d postgres --compress=0 -s
+docker_exec /usr/bin/pg_dump -Fc -U postgres -f /data/dump.data-only -d postgres --compress=0 -a
+docker_exec /usr/bin/pg_dump -Fc -U postgres -f /data/dump.inserts -d postgres --compress=0 --inserts
 echo ' done.'
 
 printf "Fixing permissions ... "
-docker compose exec ${POSTGRES_SERVICE} chmod -R a+r /data
+docker_exec chmod -R a+r /data
 echo ' done.'
 
 if test "${CI}" = 'true'
