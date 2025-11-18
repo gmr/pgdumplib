@@ -34,8 +34,7 @@ import struct
 import tempfile
 import typing
 import zlib
-from collections.abc import Generator, Sequence
-from typing import Any, Self
+from collections import abc
 
 import toposort  # type: ignore[import-untyped]
 
@@ -107,7 +106,7 @@ class TableData:
         return size
 
     @staticmethod
-    def _convert(column: Any) -> str:
+    def _convert(column: typing.Any) -> str:
         """Convert the column to a string
 
         :param column: The column to convert
@@ -285,7 +284,7 @@ class Dump:
         )
         return self.entries[-1]
 
-    def blobs(self) -> Generator[tuple[int, bytes], None, None]:
+    def blobs(self) -> typing.Generator[tuple[int, bytes], None, None]:
         """Iterator that returns each blob in the dump
 
         :rtype: tuple(int, bytes)
@@ -319,7 +318,7 @@ class Dump:
                 return entry
         return None
 
-    def load(self, path: str | os.PathLike) -> Self:
+    def load(self, path: str | os.PathLike) -> typing.Self:
         """Load the Dumpfile, including extracting all data into a temporary
         directory
 
@@ -413,7 +412,7 @@ class Dump:
 
     def table_data(
         self, namespace: str, table: str
-    ) -> Generator[str | tuple[Any, ...], None, None]:
+    ) -> typing.Generator[str | tuple[typing.Any, ...], None, None]:
         """Iterator that returns data for the given namespace and table
 
         :param str namespace: The namespace/schema for the table
@@ -430,8 +429,8 @@ class Dump:
 
     @contextlib.contextmanager
     def table_data_writer(
-        self, entry: models.Entry, columns: Sequence
-    ) -> Generator[TableData, None, None]:
+        self, entry: models.Entry, columns: abc.Sequence
+    ) -> typing.Generator[TableData, None, None]:
         """A context manager that is used to return a
         :py:class:`~pgdumplib.dump.TableData` instance, which can be used
         to add table data to the dump.
@@ -523,7 +522,7 @@ class Dump:
         """
         return max(e.dump_id for e in self.entries) + 1
 
-    def _read_blobs(self) -> Generator[tuple[int, bytes], None, None]:
+    def _read_blobs(self) -> typing.Generator[tuple[int, bytes], None, None]:
         """Read blobs, returning a tuple of the blob ID and the blob data
 
         :rtype: (int, bytes)
@@ -751,7 +750,9 @@ class Dump:
             value |= bv << (offset * 8)
         return data_state, value
 
-    def _read_table_data(self, dump_id: int) -> Generator[str, None, None]:
+    def _read_table_data(
+        self, dump_id: int
+    ) -> typing.Generator[str, None, None]:
         """Iterate through the data returning on row at a time
 
         :rtype: str
@@ -809,7 +810,7 @@ class Dump:
     @contextlib.contextmanager
     def _tempfile(
         self, dump_id: int, mode: str
-    ) -> Generator[typing.Any, None, None]:
+    ) -> typing.Generator[typing.Any, None, None]:
         """Open the temp file for the specified dump_id in the specified mode
 
         :param int dump_id: The dump_id for the temp file
