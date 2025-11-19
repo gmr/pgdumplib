@@ -6,7 +6,7 @@ Python 3 library for reading and writing pg_dump files using the custom format.
 [![Status](https://github.com/gmr/pgdumplib/workflows/Testing/badge.svg)](https://github.com/gmr/pgdumplib/actions)
 [![Coverage](https://codecov.io/gh/gmr/pgdumplib/branch/master/graph/badge.svg)](https://codecov.io/github/gmr/pgdumplib?branch=master)
 [![License](https://img.shields.io/pypi/l/pgdumplib.svg)](https://github.com/gmr/pgdumplib/blob/master/LICENSE)
-[![Docs](https://img.shields.io/readthedocs/pgdumplib.svg)](https://pgdumplib.readthedocs.io/)
+[![Docs](https://img.shields.io/badge/docs-github%20pages-blue)](https://gmr.github.io/pgdumplib/)
 
 ## Installation
 

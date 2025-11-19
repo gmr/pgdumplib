@@ -1,6 +1,6 @@
 site_name: pgdumplib
 site_description: Python3 library for reading and writing pg_dump files using the custom format
-site_url: https://pgdumplib.readthedocs.io/
+site_url: https://gmr.github.io/pgdumplib/
 repo_url: https://github.com/gmr/pgdumplib
 repo_name: gmr/pgdumplib
 
