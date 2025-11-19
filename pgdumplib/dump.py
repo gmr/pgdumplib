@@ -721,7 +721,11 @@ class Dump:
         magic_bytes = self._handle.read(5)
         if magic_bytes != constants.MAGIC:
             # Provide helpful error messages based on file content
-            error_msg = 'Invalid archive header'
+            error_msg = (
+                'Invalid archive header. '
+                'pgdumplib only supports custom format dumps '
+                'created with pg_dump -Fc'
+            )
             try:
                 # Try to detect plain SQL files
                 file_start = magic_bytes.decode('ascii', errors='ignore')
@@ -1080,9 +1084,10 @@ class Dump:
         return saved
 
     def _write_str(self, value: str | None) -> None:
-        """Write a string
+        """Write a string or NULL marker
 
-        :param str value: The string to write
+        :param value: The string to write, or None to write -1 length
+            (indicating an unset/NULL field in the archive format)
 
         """
         if self._handle is None:
