@@ -13,9 +13,11 @@ Creating your own data converter is easy and should simply extend the
 :py:class:`DataConverter` class.
 
 """
+
 import datetime
 import decimal
 import ipaddress
+import typing
 import uuid
 
 import pendulum
@@ -31,8 +33,9 @@ class DataConverter:
     the row as tuple of strings, only converting ``\\N`` to :py:const:`None`.
 
     """
+
     @staticmethod
-    def convert(row: str) -> tuple[str | None, ...]:
+    def convert(row: str) -> tuple[typing.Any, ...]:
         """Convert the string based row into a tuple of columns.
 
         :param str row: The row to convert
@@ -44,6 +47,7 @@ class DataConverter:
 
 class NoOpConverter:
     """Performs no conversion on the row passed in"""
+
     @staticmethod
     def convert(row: str) -> str:
         """Returns the row passed in
@@ -55,9 +59,18 @@ class NoOpConverter:
         return row
 
 
-SmartColumn = (None | str | int | datetime.datetime | decimal.Decimal
-               | ipaddress.IPv4Address | ipaddress.IPv4Network
-               | ipaddress.IPv6Address | ipaddress.IPv6Network | uuid.UUID)
+SmartColumn = (
+    None
+    | str
+    | int
+    | datetime.datetime
+    | decimal.Decimal
+    | ipaddress.IPv4Address
+    | ipaddress.IPv4Network
+    | ipaddress.IPv6Address
+    | ipaddress.IPv6Network
+    | uuid.UUID
+)
 
 
 class SmartDataConverter(DataConverter):
@@ -80,9 +93,13 @@ class SmartDataConverter(DataConverter):
         - :py:class:`uuid.UUID`
 
     """
-    def convert(self, row: str) -> tuple[SmartColumn, ...]:
+
+    @staticmethod
+    def convert(row: str) -> tuple[SmartColumn, ...]:
         """Convert the string based row into a tuple of columns"""
-        return tuple(self._convert_column(c) for c in row.split('\t'))
+        return tuple(
+            SmartDataConverter._convert_column(c) for c in row.split('\t')
+        )
 
     @staticmethod
     def _convert_column(column: str) -> SmartColumn:
@@ -109,9 +126,13 @@ class SmartDataConverter(DataConverter):
         except ValueError:
             pass
         for tz_fmt in {'Z', 'ZZ', 'z', 'zz'}:
-            try:
-                return pendulum.from_format(column,
-                                            f'YYYY-MM-DD HH:mm:ss {tz_fmt}')
-            except ValueError:
-                pass
+            for micro_fmt in {'.SSSSSS', ''}:
+                try:
+                    pdt = pendulum.from_format(
+                        column, f'YYYY-MM-DD HH:mm:ss{micro_fmt} {tz_fmt}'
+                    )
+                    # Convert pendulum DateTime to datetime.datetime
+                    return datetime.datetime.fromisoformat(pdt.isoformat())
+                except ValueError:
+                    pass
         return column

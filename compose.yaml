@@ -1,15 +1,17 @@
 services:
   postgres:
-    image: postgres:17
+    image: postgres:18
     healthcheck:
       test: /usr/bin/pg_isready
       interval: 30s
       timeout: 10s
+      start_period: 5s
+      start_interval: 2s
       retries: 3
     environment:
       POSTGRES_HOST_AUTH_METHOD: trust
     ports:
-      - 5432
+      - "5432"
     volumes:
       - type: bind
         source: ./build/data

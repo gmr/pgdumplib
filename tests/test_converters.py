@@ -13,12 +13,15 @@ class TestCase(unittest.TestCase):
     def test_data_converter(self):
         data = []
         for row in range(0, 10):
-            data.append([
-                str(row),
-                str(uuid.uuid4()),
-                str(datetime.datetime.now(tz=datetime.UTC)),
-                str(uuid.uuid4()), None
-            ])
+            data.append(
+                [
+                    str(row),
+                    str(uuid.uuid4()),
+                    str(datetime.datetime.now(tz=datetime.UTC)),
+                    str(uuid.uuid4()),
+                    None,
+                ]
+            )
 
         converter = converters.DataConverter()
         for _offset, expectation in enumerate(data):
@@ -42,17 +45,22 @@ class TestCase(unittest.TestCase):
         fake = faker.Faker()
         data = []
         for row in range(0, 10):
-            data.append([
-                row, None,
-                fake.pydecimal(positive=True, left_digits=5, right_digits=3),
-                uuid.uuid4(),
-                ipaddress.IPv4Network(fake.ipv4(True)),
-                ipaddress.IPv4Address(fake.ipv4()),
-                ipaddress.IPv6Address(fake.ipv6()),
-                maya.now().datetime(to_timezone='US/Eastern',
-                                    naive=True).strftime(
-                                        constants.PGDUMP_STRFTIME_FMT)
-            ])
+            data.append(
+                [
+                    row,
+                    None,
+                    fake.pydecimal(
+                        positive=True, left_digits=5, right_digits=3
+                    ),
+                    uuid.uuid4(),
+                    ipaddress.IPv4Network(fake.ipv4(True)),
+                    ipaddress.IPv4Address(fake.ipv4()),
+                    ipaddress.IPv6Address(fake.ipv6()),
+                    maya.now()
+                    .datetime(to_timezone='US/Eastern', naive=True)
+                    .strftime(constants.PGDUMP_STRFTIME_FMT),
+                ]
+            )
 
         converter = converters.SmartDataConverter()
         for _offset, expectation in enumerate(data):
@@ -63,5 +71,7 @@ class TestCase(unittest.TestCase):
     def test_smart_data_converter_bad_date(self):
         converter = converters.SmartDataConverter()
         row = '2019-13-45 25:34:99 00:00\t1\tfoo\t\\N'
-        self.assertEqual(converter.convert(row),
-                         ('2019-13-45 25:34:99 00:00', 1, 'foo', None))
+        self.assertEqual(
+            converter.convert(row),
+            ('2019-13-45 25:34:99 00:00', 1, 'foo', None),
+        )

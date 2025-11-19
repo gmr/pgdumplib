@@ -21,6 +21,7 @@ gzip compressed data files in a temporary directory that is automatically
 cleaned up when the :py:class:`~pgdumplib.dump.Dump` instance is released.
 
 """
+
 import contextlib
 import datetime
 import gzip
@@ -33,8 +34,9 @@ import struct
 import tempfile
 import typing
 import zlib
+from collections import abc
 
-import toposort
+import toposort  # type: ignore[import-untyped]
 
 from pgdumplib import constants, converters, exceptions, models, version
 
@@ -43,9 +45,6 @@ LOGGER = logging.getLogger(__name__)
 ENCODING_PATTERN = re.compile(r"^.*=\s+'(.*)'")
 
 VERSION_INFO = '{} (pgdumplib {})'
-
-Converters = (type[converters.DataConverter] | type[converters.NoOpConverter]
-              | type[converters.SmartDataConverter])
 
 
 class TableData:
@@ -56,6 +55,7 @@ class TableData:
     :py:meth:`~pgdumplib.dump.Dump.table_data_writer`.
 
     """
+
     def __init__(self, dump_id: int, tempdir: str, encoding: str):
         self.dump_id = dump_id
         self._encoding = encoding
@@ -131,29 +131,38 @@ class Dump:
         (Default: :py:class:`pgdumplib.converters.DataConverter`)
 
     """
-    def __init__(self,
-                 dbname: str = 'pgdumplib',
-                 encoding: str = 'UTF8',
-                 converter: Converters | None = None,
-                 appear_as: str = '12.0'):
+
+    def __init__(
+        self,
+        dbname: str = 'pgdumplib',
+        encoding: str = 'UTF8',
+        converter: typing.Any = None,
+        appear_as: str = '12.0',
+    ):
         self.compression_algorithm = constants.COMPRESSION_NONE
         self.dbname = dbname
         self.dump_version = VERSION_INFO.format(appear_as, version)
         self.encoding = encoding
         self.entries = [
-            models.Entry(dump_id=1,
-                         tag=constants.ENCODING,
-                         desc=constants.ENCODING,
-                         defn=f"SET client_encoding = '{self.encoding}';\n"),
-            models.Entry(dump_id=2,
-                         tag='STDSTRINGS',
-                         desc='STDSTRINGS',
-                         defn="SET standard_conforming_strings = 'on';\n"),
-            models.Entry(dump_id=3,
-                         tag='SEARCHPATH',
-                         desc='SEARCHPATH',
-                         defn='SELECT pg_catalog.set_config('
-                         "'search_path', '', false);\n")
+            models.Entry(
+                dump_id=1,
+                tag=constants.ENCODING,
+                desc=constants.ENCODING,
+                defn=f"SET client_encoding = '{self.encoding}';\n",
+            ),
+            models.Entry(
+                dump_id=2,
+                tag='STDSTRINGS',
+                desc='STDSTRINGS',
+                defn="SET standard_conforming_strings = 'on';\n",
+            ),
+            models.Entry(
+                dump_id=3,
+                tag='SEARCHPATH',
+                desc='SEARCHPATH',
+                defn='SELECT pg_catalog.set_config('
+                "'search_path', '', false);\n",
+            ),
         ]
         self.server_version = self.dump_version
         self.timestamp = datetime.datetime.now(tz=datetime.UTC)
@@ -161,37 +170,41 @@ class Dump:
         converter = converter or converters.DataConverter
         self._converter: converters.DataConverter = converter()
         self._format: str = 'Custom'
-        self._handle: typing.BinaryIO | None = None
+        self._handle: io.BufferedReader | io.BufferedWriter | None = None
         self._intsize: int = 4
         self._offsize: int = 8
         self._temp_dir = tempfile.TemporaryDirectory()
-        k_version = self._get_k_version(
-            tuple(int(v) for v in appear_as.split('.')))
+        parts = tuple(int(v) for v in appear_as.split('.'))
+        if len(parts) < 2:
+            raise ValueError(f'Invalid appear_as version: {appear_as}')
+        k_version = self._get_k_version(parts)
         self._vmaj: int = k_version[0]
         self._vmin: int = k_version[1]
         self._vrev: int = k_version[2]
         self._writers: dict[int, TableData] = {}
 
     def __repr__(self) -> str:
-        return f'<Dump format={self._format!r} ' \
-               f'timestamp={self.timestamp.isoformat()!r} ' \
-               f'entry_count={len(self.entries)!r}>'
+        return (
+            f'<Dump format={self._format!r} '
+            f'timestamp={self.timestamp.isoformat()!r} '
+            f'entry_count={len(self.entries)!r}>'
+        )
 
-    def add_entry(self,
-                  desc: str,
-                  namespace: str | None = None,
-                  tag: str | None = None,
-                  owner: str | None = None,
-                  defn: str | None = None,
-                  drop_stmt: str | None = None,
-                  copy_stmt: str | None = None,
-                  dependencies: list[int] | None = None,
-                  tablespace: str | None = None,
-                  tableam: str | None = None,
-                  dump_id: int | None = None) -> models.Entry:
+    def add_entry(
+        self,
+        desc: str,
+        namespace: str | None = None,
+        tag: str | None = None,
+        owner: str | None = None,
+        defn: str | None = None,
+        drop_stmt: str | None = None,
+        copy_stmt: str | None = None,
+        dependencies: list[int] | None = None,
+        tablespace: str | None = None,
+        tableam: str | None = None,
+        dump_id: int | None = None,
+    ) -> models.Entry:
         """Add an entry to the dump
-
-        The ``namespace`` and ``tag`` are required.
 
         A :py:exc:`ValueError` will be raised if `desc` is not value that
         is known in :py:module:`pgdumplib.constants`.
@@ -245,12 +258,28 @@ class Dump:
         for dependency in dependencies or []:
             if dependency not in dump_ids:
                 raise ValueError(
-                    f'Dependency dump_id {dependency!r} not found')
+                    f'Dependency dump_id {dependency!r} not found'
+                )
         self.entries.append(
-            models.Entry(dump_id or self._next_dump_id(), False, '', '', tag
-                         or '', desc, defn or '', drop_stmt or '', copy_stmt
-                         or '', namespace or '', tablespace or '', tableam
-                         or '', owner or '', False, dependencies or []))
+            models.Entry(
+                dump_id=dump_id or self._next_dump_id(),
+                had_dumper=False,
+                table_oid='',
+                oid='',
+                tag=tag or '',
+                desc=desc,
+                defn=defn or '',
+                drop_stmt=drop_stmt or '',
+                copy_stmt=copy_stmt or '',
+                namespace=namespace or '',
+                tablespace=tablespace or '',
+                tableam=tableam or '',
+                relkind=None,
+                owner=owner or '',
+                with_oids=False,
+                dependencies=dependencies or [],
+            )
+        )
         return self.entries[-1]
 
     def blobs(self) -> typing.Generator[tuple[int, bytes], None, None]:
@@ -259,7 +288,8 @@ class Dump:
         :rtype: tuple(int, bytes)
 
         """
-        def read_oid(fd: typing.BinaryIO) -> int | None:
+
+        def read_oid(fd: io.BufferedReader) -> int | None:
             """Small helper function to deduplicate code"""
             try:
                 return struct.unpack('I', fd.read(4))[0]
@@ -286,7 +316,7 @@ class Dump:
                 return entry
         return None
 
-    def load(self, path: os.PathLike) -> typing.Self:
+    def load(self, path: str | os.PathLike) -> typing.Self:
         """Load the Dumpfile, including extracting all data into a temporary
         directory
 
@@ -305,17 +335,28 @@ class Dump:
         self._read_header()
         if not constants.MIN_VER <= self.version <= constants.MAX_VER:
             raise ValueError(
-                'Unsupported backup version: {}.{}.{}'.format(*self.version))
+                'Unsupported backup version: {}.{}.{}'.format(*self.version)
+            )
 
         if self.version >= (1, 15, 0):
-            self.compression_algorithm = constants.COMPRESSION_ALGORITHMS[self._read_byte()]
+            self.compression_algorithm = constants.COMPRESSION_ALGORITHMS[
+                self._compression_algorithm
+            ]
 
-            if self.compression_algorithm not in constants.SUPPORTED_COMPRESSION_ALGORITHMS:
+            if (
+                self.compression_algorithm
+                not in constants.SUPPORTED_COMPRESSION_ALGORITHMS
+            ):
                 raise ValueError(
-                    'Unsupported compression algorithm: {}'.format(*self.compression_algorithm))
+                    'Unsupported compression algorithm: {}'.format(
+                        *self.compression_algorithm
+                    )
+                )
         else:
             self.compression_algorithm = (
-                constants.COMPRESSION_GZIP if self._read_int() != 0 else constants.COMPRESSION_NONE
+                constants.COMPRESSION_GZIP
+                if self._read_int() != 0
+                else constants.COMPRESSION_NONE
             )
 
         self.timestamp = self._read_timestamp()
@@ -327,76 +368,35 @@ class Dump:
         self._set_encoding()
 
         # Cache table data and blobs
-        last_pos = self._handle.tell()
+        _last_pos = self._handle.tell()
 
         for entry in self._data_entries:
             if entry.data_state == constants.K_OFFSET_NO_DATA:
                 continue
-
-            elif entry.data_state == constants.K_OFFSET_POS_SET:
-                self._handle.seek(entry.offset, io.SEEK_SET)
-                block_type, dump_id = self._read_block_header()
-                if not dump_id or dump_id != entry.dump_id:
-                    raise RuntimeError(f'Dump IDs do not match ({dump_id} != {entry.dump_id})')
-                self._cache_block_data(block_type, dump_id)
-
-            elif entry.data_state == constants.K_OFFSET_POS_NOT_SET:
-                self._handle.seek(last_pos)
-
-                while True:
-                    pos = self._handle.tell()
-                    try:
-                        block_type, dump_id = self._read_block_header()
-                    except EOFError:
-                        return self
-
-                    if entry.dump_id == dump_id:
-                        break
-
-                    # Cache position for any data blocks we find
-                    data_entry = next((e for e in self._data_entries if e.dump_id == dump_id), None)
-
-                    if data_entry and data_entry.data_state == constants.K_OFFSET_POS_NOT_SET:
-                        data_entry.offset = pos
-                        data_entry.data_state = constants.K_OFFSET_POS_SET
-
-                    # Skip this block
-                    if block_type == constants.BLK_DATA:
-                        self._read_data()
-                    elif block_type == constants.BLK_BLOBS:
-                        self._read_blobs()
-                    else:
-                        raise RuntimeError(f'Unknown block type: {block_type}')
-
-                self._cache_block_data(block_type, dump_id)
-
-                # Read the end marker
-                end_marker = self._read_int()
-                if end_marker != 0:
-                    raise RuntimeError(f'Unexpected end marker: {end_marker}')
-
-                cur_pos = self._handle.tell()
-                if cur_pos > last_pos:
-                    last_pos = cur_pos
-
+            elif entry.data_state != constants.K_OFFSET_POS_SET:
+                raise RuntimeError('Unsupported data format')
+            self._handle.seek(entry.offset, io.SEEK_SET)
+            block_type, dump_id = self._read_block_header()
+            if not dump_id or dump_id != entry.dump_id:
+                raise RuntimeError(
+                    f'Dump IDs do not match ({dump_id} != {entry.dump_id}'
+                )
+            if block_type == constants.BLK_DATA:
+                self._cache_table_data(dump_id)
+            elif block_type == constants.BLK_BLOBS:
+                self._cache_blobs(dump_id)
+            else:
+                raise RuntimeError(f'Unknown block type: {block_type!r}')
         return self
 
-    def _cache_block_data(self, block_type, dump_id):
-        if block_type == constants.BLK_DATA:
-            self._cache_table_data(dump_id)
-        elif block_type == constants.BLK_BLOBS:
-            self._cache_blobs(dump_id)
-        else:
-            raise RuntimeError(f'Unexpected block type {block_type}')
-
-    def lookup_entry(self, desc: str, namespace: str, tag: str) \
-            -> models.Entry | None:
+    def lookup_entry(
+        self, desc: str, namespace: str, tag: str
+    ) -> models.Entry | None:
         """Return the entry for the given namespace and tag
 
         :param str desc: The desc / object type of the entry
         :param str namespace: The namespace of the entry
         :param str tag: The tag/relation/table name
-        :param str section: The dump section the entry is for
         :raises: :py:exc:`ValueError`
         :rtype: pgdumplib.dump.Entry or None
 
@@ -408,21 +408,23 @@ class Dump:
                 return entry
         return None
 
-    def save(self, path: os.PathLike) -> None:
+    def save(self, path: str | os.PathLike) -> None:
         """Save the Dump file to the specified path
 
-        :param os.PathLike path: The path to save the dump to
+        :param path: The path to save the dump to
+        :type path: str or os.PathLike
 
         """
-        if getattr(self, '_handle', None) and not self._handle.closed:
+        if self._handle is not None and not self._handle.closed:
             self._handle.close()
         self.compression_algorithm = constants.COMPRESSION_NONE
         self._handle = open(path, 'wb')
         self._save()
         self._handle.close()
 
-    def table_data(self, namespace: str, table: str) \
-            -> typing.Generator[str | tuple[typing.Any, ...], None, None]:
+    def table_data(
+        self, namespace: str, table: str
+    ) -> typing.Generator[str | tuple[typing.Any, ...], None, None]:
         """Iterator that returns data for the given namespace and table
 
         :param str namespace: The namespace/schema for the table
@@ -438,10 +440,9 @@ class Dump:
         raise exceptions.EntityNotFoundError(namespace=namespace, table=table)
 
     @contextlib.contextmanager
-    def table_data_writer(self,
-                          entry: models.Entry,
-                          columns: typing.Sequence) \
-            -> typing.Generator[TableData, None, None]:
+    def table_data_writer(
+        self, entry: models.Entry, columns: abc.Sequence
+    ) -> typing.Generator[TableData, None, None]:
         """A context manager that is used to return a
         :py:class:`~pgdumplib.dump.TableData` instance, which can be used
         to add table data to the dump.
@@ -457,20 +458,23 @@ class Dump:
         if entry.dump_id not in self._writers.keys():
             dump_id = self._next_dump_id()
             self.entries.append(
-                models.Entry(dump_id=dump_id,
-                             had_dumper=True,
-                             tag=entry.tag,
-                             desc=constants.TABLE_DATA,
-                             copy_stmt='COPY {}.{} ({}) FROM stdin;'.format(
-                                 entry.namespace, entry.tag,
-                                 ', '.join(columns)),
-                             namespace=entry.namespace,
-                             owner=entry.owner,
-                             dependencies=[entry.dump_id],
-                             data_state=constants.K_OFFSET_POS_NOT_SET))
-            self._writers[entry.dump_id] = TableData(dump_id,
-                                                     self._temp_dir.name,
-                                                     self.encoding)
+                models.Entry(
+                    dump_id=dump_id,
+                    had_dumper=True,
+                    tag=entry.tag,
+                    desc=constants.TABLE_DATA,
+                    copy_stmt='COPY {}.{} ({}) FROM stdin;'.format(
+                        entry.namespace, entry.tag, ', '.join(columns)
+                    ),
+                    namespace=entry.namespace,
+                    owner=entry.owner,
+                    dependencies=[entry.dump_id],
+                    data_state=constants.K_OFFSET_POS_NOT_SET,
+                )
+            )
+            self._writers[entry.dump_id] = TableData(
+                dump_id, self._temp_dir.name, self.encoding
+            )
         yield self._writers[entry.dump_id]
         return None
 
@@ -516,8 +520,7 @@ class Dump:
         return [e for e in self.entries if e.section == constants.SECTION_DATA]
 
     @staticmethod
-    def _get_k_version(appear_as: tuple[int, int]) \
-            -> tuple[int, int, int]:
+    def _get_k_version(appear_as: tuple[int, ...]) -> tuple[int, int, int]:
         for (min_ver, max_ver), value in constants.K_VERSION_MAP.items():
             if min_ver <= appear_as <= max_ver:
                 return value
@@ -552,6 +555,8 @@ class Dump:
         :rtype: bytes, int
 
         """
+        if self._handle is None:
+            raise ValueError('File handle is not initialized')
         return self._handle.read(1), self._read_int()
 
     def _read_byte(self) -> int | None:
@@ -560,6 +565,8 @@ class Dump:
         :rtype: int
 
         """
+        if self._handle is None:
+            raise ValueError('File handle is not initialized')
         try:
             return struct.unpack('B', self._handle.read(1))[0]
         except struct.error:
@@ -571,6 +578,8 @@ class Dump:
         :rtype: bytes
 
         """
+        if self._handle is None:
+            raise ValueError('File handle is not initialized')
         length = self._read_int()
         if length and length > 0:
             value = self._handle.read(length)
@@ -593,6 +602,8 @@ class Dump:
         :rtype: bytes
 
         """
+        if self._handle is None:
+            raise ValueError('File handle is not initialized')
         buffer = io.BytesIO()
         chunk = b''
         decompress = zlib.decompressobj()
@@ -613,6 +624,8 @@ class Dump:
         :rtype: bytes
 
         """
+        if self._handle is None:
+            raise ValueError('File handle is not initialized')
         buffer = io.BytesIO()
         while True:
             block_length = self._read_int()
@@ -621,7 +634,7 @@ class Dump:
             buffer.write(self._handle.read(block_length))
         return buffer.getvalue()
 
-    def _read_dependencies(self) -> list:
+    def _read_dependencies(self) -> list[int]:
         """Read in the dependencies for an entry.
 
         :rtype: list
@@ -643,6 +656,8 @@ class Dump:
     def _read_entry(self) -> None:
         """Read in an individual entry and append it to the entries stack"""
         dump_id = self._read_int()
+        if dump_id is None:
+            raise ValueError('dump_id cannot be None')
         had_dumper = bool(self._read_int())
         table_oid = self._read_bytes().decode(self.encoding)
         oid = self._read_bytes().decode(self.encoding)
@@ -658,28 +673,37 @@ class Dump:
             tableam = self._read_bytes().decode(self.encoding)
         else:
             tableam = ''
+        if self.version >= (1, 16, 0):
+            relkind_val = self._read_int()
+            relkind = chr(relkind_val) if relkind_val else None
+        else:
+            relkind = None
         owner = self._read_bytes().decode(self.encoding)
         with_oids = self._read_bytes() == b'true'
         dependencies = self._read_dependencies()
         data_state, offset = self._read_offset()
         self.entries.append(
-            models.Entry(dump_id=dump_id,
-                         had_dumper=had_dumper,
-                         table_oid=table_oid,
-                         oid=oid,
-                         tag=tag,
-                         desc=desc,
-                         defn=defn,
-                         drop_stmt=drop_stmt,
-                         copy_stmt=copy_stmt,
-                         namespace=namespace,
-                         tablespace=tablespace,
-                         tableam=tableam,
-                         owner=owner,
-                         with_oids=with_oids,
-                         dependencies=dependencies,
-                         data_state=data_state or 0,
-                         offset=offset or 0))
+            models.Entry(
+                dump_id=dump_id,
+                had_dumper=had_dumper,
+                table_oid=table_oid,
+                oid=oid,
+                tag=tag,
+                desc=desc,
+                defn=defn,
+                drop_stmt=drop_stmt,
+                copy_stmt=copy_stmt,
+                namespace=namespace,
+                tablespace=tablespace,
+                tableam=tableam,
+                relkind=relkind,
+                owner=owner,
+                with_oids=with_oids,
+                dependencies=dependencies,
+                data_state=data_state or 0,
+                offset=offset or 0,
+            )
+        )
 
     def _read_header(self) -> None:
         """Read in the dump header
@@ -687,6 +711,8 @@ class Dump:
         :raises: ValueError
 
         """
+        if self._handle is None:
+            raise ValueError('File handle is not initialized')
         if self._handle.read(5) != constants.MAGIC:
             raise ValueError('Invalid archive header')
         self._vmaj = struct.unpack('B', self._handle.read(1))[0]
@@ -694,10 +720,17 @@ class Dump:
         self._vrev = struct.unpack('B', self._handle.read(1))[0]
         self._intsize = struct.unpack('B', self._handle.read(1))[0]
         self._offsize = struct.unpack('B', self._handle.read(1))[0]
-        self._format = constants.FORMATS[struct.unpack(
-            'B', self._handle.read(1))[0]]
-        LOGGER.debug('Archive version %i.%i.%i', self._vmaj, self._vmin,
-                     self._vrev)
+        self._format = constants.FORMATS[
+            struct.unpack('B', self._handle.read(1))[0]
+        ]
+        LOGGER.debug(
+            'Archive version %i.%i.%i', self._vmaj, self._vmin, self._vrev
+        )
+        # v1.15+ has compression_spec.algorithm byte
+        if (self._vmaj, self._vmin, self._vrev) >= (1, 15, 0):
+            self._compression_algorithm = struct.unpack(
+                'B', self._handle.read(1)
+            )[0]
 
     def _read_int(self) -> int | None:
         """Read in a signed integer
@@ -712,7 +745,7 @@ class Dump:
         for _offset in range(0, self._intsize):
             bv = (self._read_byte() or 0) & 0xFF
             if bv != 0:
-                value += (bv << bs)
+                value += bv << bs
             bs += 8
         return -value if sign else value
 
@@ -729,8 +762,9 @@ class Dump:
             value |= bv << (offset * 8)
         return data_state, value
 
-    def _read_table_data(self, dump_id: int) \
-            -> typing.Generator[str, None, None]:
+    def _read_table_data(
+        self, dump_id: int
+    ) -> typing.Generator[str, None, None]:
         """Iterate through the data returning on row at a time
 
         :rtype: str
@@ -752,22 +786,18 @@ class Dump:
         :rtype: datetime.datetime
 
         """
-        second, minute, hour, day, month, year = (self._read_int(),
-                                                  self._read_int(),
-                                                  self._read_int(),
-                                                  self._read_int(),
-                                                  (self._read_int() or 0) + 1,
-                                                  (self._read_int() or 0) +
-                                                  1900)
+        second, minute, hour, day, month, year = (
+            self._read_int() or 0,
+            self._read_int() or 0,
+            self._read_int() or 0,
+            self._read_int() or 0,
+            (self._read_int() or 0) + 1,
+            (self._read_int() or 0) + 1900,
+        )
         self._read_int()  # DST flag
-        return datetime.datetime(year,
-                                 month,
-                                 day,
-                                 hour,
-                                 minute,
-                                 second,
-                                 0,
-                                 tzinfo=datetime.UTC)
+        return datetime.datetime(
+            year, month, day, hour, minute, second, 0, tzinfo=datetime.UTC
+        )
 
     def _save(self) -> None:
         """Save the dump file to disk"""
@@ -783,15 +813,16 @@ class Dump:
 
         """
         for entry in self.entries:
-            if entry.desc == constants.ENCODING:
+            if entry.desc == constants.ENCODING and entry.defn:
                 match = ENCODING_PATTERN.match(entry.defn)
                 if match:
                     self.encoding = match.group(1)
                     return
 
     @contextlib.contextmanager
-    def _tempfile(self, dump_id: int, mode: str) \
-            -> typing.Generator[typing.IO[bytes], None, None]:
+    def _tempfile(
+        self, dump_id: int, mode: str
+    ) -> typing.Generator[typing.Any, None, None]:
         """Open the temp file for the specified dump_id in the specified mode
 
         :param int dump_id: The dump_id for the temp file
@@ -814,6 +845,9 @@ class Dump:
         :rtype: int
 
         """
+        if self._handle is None:
+            raise ValueError('File handle is not initialized')
+        length = 0
         with self._tempfile(dump_id, 'rb') as handle:
             self._handle.write(constants.BLK_BLOBS)
             self._write_int(dump_id)
@@ -836,10 +870,14 @@ class Dump:
         :param int value: The byte value
 
         """
+        if self._handle is None:
+            raise ValueError('File handle is not initialized')
         self._handle.write(struct.pack('B', value))
 
-    def _write_data(self) -> set:
+    def _write_data(self) -> set[int]:
         """Write the data blocks, returning a set of IDs that were written"""
+        if self._handle is None:
+            raise ValueError('File handle is not initialized')
         saved = set({})
         for offset, entry in enumerate(self.entries):
             if entry.section != constants.SECTION_DATA:
@@ -856,7 +894,7 @@ class Dump:
                 self.entries[offset].data_state = constants.K_OFFSET_POS_SET
         return saved
 
-    def _write_entries(self):
+    def _write_entries(self) -> None:
         self._write_int(len(self.entries))
         saved = set({})
 
@@ -865,21 +903,42 @@ class Dump:
             self._write_entry(entry)
             saved.add(entry.dump_id)
 
-        saved = self._write_section(constants.SECTION_PRE_DATA, [
-            constants.GROUP, constants.ROLE, constants.USER, constants.SCHEMA,
-            constants.EXTENSION, constants.AGGREGATE, constants.OPERATOR,
-            constants.OPERATOR_CLASS, constants.CAST, constants.COLLATION,
-            constants.CONVERSION, constants.PROCEDURAL_LANGUAGE,
-            constants.FOREIGN_DATA_WRAPPER, constants.FOREIGN_SERVER,
-            constants.SERVER, constants.DOMAIN, constants.TYPE,
-            constants.SHELL_TYPE
-        ], saved)
+        saved = self._write_section(
+            constants.SECTION_PRE_DATA,
+            [
+                constants.GROUP,
+                constants.ROLE,
+                constants.USER,
+                constants.SCHEMA,
+                constants.EXTENSION,
+                constants.AGGREGATE,
+                constants.OPERATOR,
+                constants.OPERATOR_CLASS,
+                constants.CAST,
+                constants.COLLATION,
+                constants.CONVERSION,
+                constants.PROCEDURAL_LANGUAGE,
+                constants.FOREIGN_DATA_WRAPPER,
+                constants.FOREIGN_SERVER,
+                constants.SERVER,
+                constants.DOMAIN,
+                constants.TYPE,
+                constants.SHELL_TYPE,
+            ],
+            saved,
+        )
 
         saved = self._write_section(constants.SECTION_DATA, [], saved)
 
-        saved = self._write_section(constants.SECTION_POST_DATA, [
-            constants.CHECK_CONSTRAINT, constants.CONSTRAINT, constants.INDEX
-        ], saved)
+        saved = self._write_section(
+            constants.SECTION_POST_DATA,
+            [
+                constants.CHECK_CONSTRAINT,
+                constants.CONSTRAINT,
+                constants.INDEX,
+            ],
+            saved,
+        )
 
         saved = self._write_section(constants.SECTION_NONE, [], saved)
         LOGGER.debug('Wrote %i of %i entries', len(saved), len(self.entries))
@@ -906,6 +965,11 @@ class Dump:
         if self.version >= (1, 14, 0):
             LOGGER.debug('Adding tableam')
             self._write_str(entry.tableam)
+        if self.version >= (1, 16, 0):
+            LOGGER.debug('Adding relkind')
+            # Write relkind as an int (character code)
+            relkind_val = ord(entry.relkind) if entry.relkind else 0
+            self._write_int(relkind_val)
         self._write_str(entry.owner)
         self._write_str('true' if entry.with_oids else 'false')
         for dependency in entry.dependencies or []:
@@ -915,8 +979,14 @@ class Dump:
 
     def _write_header(self) -> None:
         """Write the file header"""
-        LOGGER.debug('Writing archive version %i.%i.%i', self._vmaj,
-                     self._vmin, self._vrev)
+        if self._handle is None:
+            raise ValueError('File handle is not initialized')
+        LOGGER.debug(
+            'Writing archive version %i.%i.%i',
+            self._vmaj,
+            self._vmin,
+            self._vrev,
+        )
         self._handle.write(constants.MAGIC)
         self._write_byte(self._vmaj)
         self._write_byte(self._vmin)
@@ -924,6 +994,13 @@ class Dump:
         self._write_byte(self._intsize)
         self._write_byte(self._offsize)
         self._write_byte(constants.FORMATS.index(self._format))
+        # v1.15+ has compression algorithm in header
+        if self.version >= (1, 15, 0):
+            # Write compression algorithm: 0=none, 1=gzip, 2=lz4, 3=zstd
+            comp_alg = constants.COMPRESSION_ALGORITHMS.index(
+                self.compression_algorithm
+            )
+            self._write_byte(comp_alg)
 
     def _write_int(self, value: int) -> None:
         """Write an integer value
@@ -931,6 +1008,8 @@ class Dump:
         :param int value:
 
         """
+        if self._handle is None:
+            raise ValueError('File handle is not initialized')
         self._write_byte(1 if value < 0 else 0)
         if value < 0:
             value = -value
@@ -950,7 +1029,9 @@ class Dump:
             self._write_byte(value & 0xFF)
             value >>= 8
 
-    def _write_section(self, section: str, obj_types: list, saved: set) -> set:
+    def _write_section(
+        self, section: str, obj_types: list[str], saved: set[int]
+    ) -> set[int]:
         for obj_type in obj_types:
             for entry in [e for e in self.entries if e.desc == obj_type]:
                 self._write_entry(entry)
@@ -958,19 +1039,28 @@ class Dump:
         for dump_id in toposort.toposort_flatten(
             {
                 e.dump_id: set(e.dependencies)
-                for e in self.entries if e.section == section
-            }, True):
+                for e in self.entries
+                if e.section == section
+            },
+            True,
+        ):
             if dump_id not in saved:
-                self._write_entry(self.get_entry(dump_id))
-                saved.add(dump_id)
+                found_entry: models.Entry | None = self.get_entry(dump_id)
+                if found_entry:
+                    self._write_entry(found_entry)
+                    saved.add(dump_id)
+                else:
+                    LOGGER.warning('Entry %d not found, skipping', dump_id)
         return saved
 
-    def _write_str(self, value: str) -> None:
+    def _write_str(self, value: str | None) -> None:
         """Write a string
 
         :param str value: The string to write
 
         """
+        if self._handle is None:
+            raise ValueError('File handle is not initialized')
         out = value.encode(self.encoding) if value else b''
         self._write_int(len(out))
         if out:
@@ -984,27 +1074,86 @@ class Dump:
         :rtype: int
 
         """
+        if self._handle is None:
+            raise ValueError('File handle is not initialized')
         self._handle.write(constants.BLK_DATA)
         self._write_int(dump_id)
 
         writer = [w for w in self._writers.values() if w.dump_id == dump_id]
-        if writer:  # Data was added ad-hoc
+        if writer:  # Data was added ad-hoc, read from TableData writer
             writer[0].finish()
-            self._write_int(writer[0].size)
-            self._handle.write(writer[0].read())
-            self._write_int(0)  # End of data indicator
-            return writer[0].size
+            # writer.read() returns decompressed data (auto-decompressed)
+            data = writer[0].read()
 
-        # Data was cached on load
+            if self.compression_algorithm != constants.COMPRESSION_NONE:
+                # Re-compress with zlib and write in chunks
+                # Compress all data as a continuous stream
+                compressed_data = zlib.compress(data)
+
+                # Write compressed data in ZLIB_IN_SIZE chunks
+                total_size = 0
+                offset = 0
+                while offset < len(compressed_data):
+                    chunk_size = min(
+                        constants.ZLIB_IN_SIZE, len(compressed_data) - offset
+                    )
+                    self._write_int(chunk_size)
+                    self._handle.write(
+                        compressed_data[offset : offset + chunk_size]
+                    )
+                    total_size += chunk_size
+                    offset += chunk_size
+            else:
+                # Write uncompressed in chunks
+                total_size = 0
+                offset = 0
+                while offset < len(data):
+                    chunk_size = min(
+                        constants.ZLIB_IN_SIZE, len(data) - offset
+                    )
+                    self._write_int(chunk_size)
+                    self._handle.write(data[offset : offset + chunk_size])
+                    total_size += chunk_size
+                    offset += chunk_size
+            self._write_int(0)  # End of data indicator
+            return total_size
+
+        # Data was cached on load - read from tempfile and write
         with self._tempfile(dump_id, 'rb') as handle:
-            handle.seek(0, io.SEEK_END)  # Seek to end to figure out size
-            size = handle.tell()
-            self._write_int(size)
-            if size:
-                handle.seek(0)  # Rewind to read data
-                self._handle.write(handle.read())
+            # Read all decompressed data from the gzip temp file
+            data = handle.read()
+
+        if self.compression_algorithm != constants.COMPRESSION_NONE:
+            # Compress and write in chunks
+            # Compress all data as a continuous stream
+            compressed_data = zlib.compress(data)
+
+            # Write compressed data in ZLIB_IN_SIZE chunks
+            total_size = 0
+            offset = 0
+            while offset < len(compressed_data):
+                chunk_size = min(
+                    constants.ZLIB_IN_SIZE, len(compressed_data) - offset
+                )
+                self._write_int(chunk_size)
+                self._handle.write(
+                    compressed_data[offset : offset + chunk_size]
+                )
+                total_size += chunk_size
+                offset += chunk_size
+        else:
+            # Write uncompressed in chunks
+            total_size = 0
+            offset = 0
+            while offset < len(data):
+                chunk_size = min(constants.ZLIB_IN_SIZE, len(data) - offset)
+                self._write_int(chunk_size)
+                self._handle.write(data[offset : offset + chunk_size])
+                total_size += chunk_size
+                offset += chunk_size
+
         self._write_int(0)  # End of data indicator
-        return size
+        return total_size
 
     def _write_timestamp(self, value: datetime.datetime) -> None:
         """Write a datetime.datetime value
@@ -1012,6 +1161,8 @@ class Dump:
         :param datetime.datetime value: The value to write
 
         """
+        if self._handle is None:
+            raise ValueError('File handle is not initialized')
         self._write_int(value.second)
         self._write_int(value.minute)
         self._write_int(value.hour)
@@ -1022,13 +1173,15 @@ class Dump:
 
     def _write_toc(self) -> None:
         """Write the ToC for the file"""
+        if self._handle is None:
+            raise ValueError('File handle is not initialized')
         self._handle.seek(0)
         self._write_header()
-
-        if self.version >= (1, 15, 0):
-            self._write_byte(constants.COMPRESSION_ALGORITHMS.index(self.compression_algorithm))
-        else:
-            self._write_int(int(self.compression_algorithm != constants.COMPRESSION_NONE))
+        # v1.15+ has compression in header, older versions have it here
+        if self.version < (1, 15, 0):
+            self._write_int(
+                int(self.compression_algorithm != constants.COMPRESSION_NONE)
+            )
 
         self._write_timestamp(self.timestamp)
         self._write_str(self.dbname)

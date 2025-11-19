@@ -26,6 +26,7 @@ class Entry:
     :var namespace: The namespace of the entry
     :var tablespace: The tablespace to use
     :var tableam: The table access method
+    :var relkind: The relation kind (added in v1.16)
     :var owner: The owner of the object in Postgres
     :var with_oids: Indicates ...
     :var dependencies: A list of dump_ids of objects that the entry
@@ -35,6 +36,7 @@ class Entry:
     :var section: The section of the dump file the entry belongs to
 
     """
+
     dump_id: int
     had_dumper: bool = False
     table_oid: str = '0'
@@ -47,6 +49,7 @@ class Entry:
     namespace: str | None = None
     tablespace: str | None = None
     tableam: str | None = None
+    relkind: str | None = None
     owner: str | None = None
     with_oids: bool = False
     dependencies: list[int] = dataclasses.field(default_factory=list)
