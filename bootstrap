@@ -118,7 +118,13 @@ docker_exec /usr/bin/psql -U postgres -d postgres -q -o /dev/null -f /fixtures/s
 echo ' done.'
 
 printf "Generating fixture data ... "
-python bin/generate-fixture-data.py -U postgres -h "${TEST_HOST}" -p "${PGPORT}" -d postgres
+if test "${CI}" = 'true'
+then
+	# In CI, connect to localhost since port is exposed from service container
+	python bin/generate-fixture-data.py -U postgres -h localhost -p 5432 -d postgres
+else
+	python bin/generate-fixture-data.py -U postgres -h "${TEST_HOST}" -p "${PGPORT}" -d postgres
+fi
 echo ' done.'
 
 printf "Creating test backups ... "
