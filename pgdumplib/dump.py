@@ -206,8 +206,6 @@ class Dump:
     ) -> models.Entry:
         """Add an entry to the dump
 
-        The ``namespace`` and ``tag`` are required.
-
         A :py:exc:`ValueError` will be raised if `desc` is not value that
         is known in :py:module:`pgdumplib.constants`.
 
@@ -399,7 +397,6 @@ class Dump:
         :param str desc: The desc / object type of the entry
         :param str namespace: The namespace of the entry
         :param str tag: The tag/relation/table name
-        :param str section: The dump section the entry is for
         :raises: :py:exc:`ValueError`
         :rtype: pgdumplib.dump.Entry or None
 
@@ -414,7 +411,8 @@ class Dump:
     def save(self, path: str | os.PathLike) -> None:
         """Save the Dump file to the specified path
 
-        :param os.PathLike path: The path to save the dump to
+        :param path: The path to save the dump to
+        :type path: str or os.PathLike
 
         """
         if getattr(self, '_handle', None) and not self._handle.closed:

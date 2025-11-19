@@ -23,10 +23,11 @@ def load(
 ) -> 'dump.Dump':
     """Load a pg_dump file created with -Fd from disk
 
-    :param os.PathLike filepath: The path to the dump to load
-    :param class converter: The data converter class to use
+    :param filepath: The path to the dump to load
+    :type filepath: str or pathlib.Path
+    :param converter: The data converter class to use
         (Default: :py:class:`pgdumplib.converters.DataConverter`)
-    :type converter: pgdumplib.converters.DataConverter or None
+    :type converter: Converter class or None
     :raises: :py:exc:`ValueError`
     :rtype: pgdumplib.dump.Dump
 
@@ -48,7 +49,7 @@ def new(
     :param encoding: The data encoding (Default: ``UTF8``)
     :param converter: The data converter class to use
         (Default: :py:class:`pgdumplib.converters.DataConverter`)
-    :type converter: pgdumplib.converters.DataConverter or None
+    :type converter: Converter class or None
     :param appear_as: The version of Postgres to emulate
         (Default: ``12.0``)
     :rtype: pgdumplib.dump.Dump
