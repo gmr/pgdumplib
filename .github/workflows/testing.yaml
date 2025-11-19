@@ -49,6 +49,11 @@ jobs:
         with:
           timezoneLinux: "America/New_York"
 
+      - name: Install PostgreSQL client tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client-${{ matrix.postgres }}
+
       - name: Prepare container directories and copy fixtures
         run: |
           # Create directories inside the container
