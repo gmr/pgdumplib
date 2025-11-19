@@ -176,6 +176,19 @@ class UnescapeCopyTextTestCase(unittest.TestCase):
         self.assertEqual(converters.unescape_copy_text('\\@'), '@')
         self.assertEqual(converters.unescape_copy_text('\\?'), '?')
 
+    def test_incomplete_hex_escapes(self):
+        """Test edge cases with incomplete or invalid hex escapes"""
+        # \x with no digits - 'x' is taken literally
+        self.assertEqual(converters.unescape_copy_text('\\x'), 'x')
+        # \x with non-hex character - 'x' and following char are literal
+        self.assertEqual(converters.unescape_copy_text('\\xG'), 'xG')
+        self.assertEqual(converters.unescape_copy_text('\\xZ9'), 'xZ9')
+
+    def test_trailing_backslash(self):
+        """Test that a trailing backslash is preserved"""
+        self.assertEqual(converters.unescape_copy_text('foo\\'), 'foo\\')
+        self.assertEqual(converters.unescape_copy_text('\\'), '\\')
+
     def test_combined_escapes(self):
         """Test multiple escape sequences in one string"""
         self.assertEqual(
