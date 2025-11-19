@@ -51,6 +51,9 @@ jobs:
 
       - name: Install PostgreSQL client tools
         run: |
+          # Add PostgreSQL APT repository for version-specific client tools
+          sudo apt-get install -y postgresql-common
+          sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
           sudo apt-get update
           sudo apt-get install -y postgresql-client-${{ matrix.postgres }}
 
