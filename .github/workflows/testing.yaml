@@ -18,8 +18,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python: ["3.12"] # ["3.11", "3.12", "3.13", "3.14"]
-        postgres: [18] # [15, 16, 17, 18]
+        python: ["3.11", "3.12", "3.13", "3.14"]
+        postgres: [15, 16, 17, 18]
     services:
       postgres:
         image: postgres:${{ matrix.postgres }}
