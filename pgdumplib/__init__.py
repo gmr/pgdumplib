@@ -41,7 +41,7 @@ def new(
     dbname: str = 'pgdumplib',
     encoding: str = 'UTF8',
     converter: typing.Any = None,
-    appear_as: str = '12.0',
+    appear_as: str = '18.0',
 ) -> 'dump.Dump':
     """Create a new :py:class:`pgdumplib.dump.Dump` instance
 
@@ -51,7 +51,7 @@ def new(
         (Default: :py:class:`pgdumplib.converters.DataConverter`)
     :type converter: Converter class or None
     :param appear_as: The version of Postgres to emulate
-        (Default: ``12.0``)
+        (Default: ``18.0``)
     :rtype: pgdumplib.dump.Dump
 
     """
