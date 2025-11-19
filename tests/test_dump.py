@@ -7,7 +7,6 @@ import os
 import pathlib
 import re
 import subprocess
-import sys
 import tempfile
 import unittest
 import uuid
@@ -39,21 +38,6 @@ PATTERNS = {
 }
 
 
-class EnvironmentVariableMixin:
-    @classmethod
-    def setUpClass(cls):
-        cls.os_environ = {}
-        path = pathlib.Path(__file__).parent.parent / 'build' / 'test.env'
-        if not path.exists():
-            sys.stderr.write('Failed to find test.env.file\n')
-            return
-        with path.open('r') as f:
-            for line in f:
-                line = line.removeprefix('export ')
-                name, _, value = line.strip().partition('=')
-                cls.os_environ[name] = value
-
-
 @dataclasses.dataclass
 class DumpInfo:
     timestamp: datetime.datetime
@@ -68,7 +52,7 @@ class DumpInfo:
     entry_count: int
 
 
-class TestCase(unittest.TestCase, EnvironmentVariableMixin):
+class TestCase(unittest.TestCase):
     PATH = 'dump.not-compressed'
     CONVERTER = converters.DataConverter
 

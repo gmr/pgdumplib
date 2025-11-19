@@ -7,6 +7,7 @@ name = "pgdumplib"
 version = "4.0.0"
 description = "Python3 library for working with pg_dump files"
 readme = "README.md"
+requires-python = ">=3.11"
 license = { text = "BSD 3-Clause License" }
 urls = { Homepage = "https://github.com/gmr/pgdumplib" }
 authors = [
