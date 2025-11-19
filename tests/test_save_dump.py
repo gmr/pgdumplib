@@ -1,6 +1,9 @@
 import dataclasses
 import datetime
+import os
 import pathlib
+import subprocess
+import tempfile
 import unittest
 import uuid
 
@@ -174,3 +177,74 @@ class CreateDumpTestCase(unittest.TestCase):
         self.assertEqual(entry.tag, 'postgres')
         values = list(dmp.table_data('public', 'example'))
         self.assertListEqual(values, rows)
+
+
+class Issue6RegressionTestCase(unittest.TestCase):
+    """Regression test for GitHub issue #6: empty tableam causing invalid SQL
+
+    When pgdumplib loads and saves a dump, it should not generate entries
+    with empty tableam values that cause pg_restore to generate invalid SQL
+    like: SET default_table_access_method = "";
+    """
+
+    def test_load_save_no_empty_tableam_sql(self):
+        """Test that resaved dumps don't generate invalid empty tableam SQL"""
+        # Create a test dump with a table (has tableam) and others without
+        dmp = pgdumplib.new('test_issue6', 'UTF8', appear_as='13.1')
+
+        # Add a table with tableam='heap'
+        dmp.add_entry(
+            constants.TABLE,
+            namespace='public',
+            tag='test_table',
+            owner='postgres',
+            defn='CREATE TABLE public.test_table (id integer);',
+            tableam='heap',
+        )
+
+        # Add a sequence (should not have tableam set)
+        dmp.add_entry(
+            constants.SEQUENCE,
+            namespace='public',
+            tag='test_seq',
+            owner='postgres',
+            defn='CREATE SEQUENCE public.test_seq;',
+        )
+
+        # Save and reload
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.dump') as tmp:
+            tmp_path = tmp.name
+
+        try:
+            dmp.save(tmp_path)
+
+            # Check that pg_restore can generate valid SQL
+            result = subprocess.run(  # noqa: S603
+                ['pg_restore', '--schema-only', '-f', '-', tmp_path],  # noqa: S607
+                capture_output=True,
+                text=True,
+            )
+
+            # Should not fail
+            self.assertEqual(
+                result.returncode,
+                0,
+                f'pg_restore failed: {result.stderr}',
+            )
+
+            # Should not contain invalid empty SET statement
+            self.assertNotIn(
+                'SET default_table_access_method = ""',
+                result.stdout,
+                'Found invalid empty tableam SET statement in output',
+            )
+
+            # Should contain the valid SET statement for the table
+            self.assertIn(
+                'SET default_table_access_method = heap',
+                result.stdout,
+                'Missing valid tableam SET statement for table',
+            )
+        finally:
+            if os.path.exists(tmp_path):
+                os.unlink(tmp_path)

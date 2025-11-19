@@ -272,8 +272,8 @@ class Dump:
                 drop_stmt=drop_stmt or '',
                 copy_stmt=copy_stmt or '',
                 namespace=namespace or '',
-                tablespace=tablespace or '',
-                tableam=tableam or '',
+                tablespace=tablespace or None,
+                tableam=tableam or None,
                 relkind=None,
                 owner=owner or '',
                 with_oids=False,
@@ -669,10 +669,15 @@ class Dump:
         copy_stmt = self._read_bytes().decode(self.encoding)
         namespace = self._read_bytes().decode(self.encoding)
         tablespace = self._read_bytes().decode(self.encoding)
+        # Normalize empty strings to None for consistency
+        tablespace = tablespace if tablespace else None
         if self.version >= (1, 14, 0):
             tableam = self._read_bytes().decode(self.encoding)
+            # Normalize empty strings to None to prevent invalid SQL
+            # generation (e.g., SET default_table_access_method = "";)
+            tableam = tableam if tableam else None
         else:
-            tableam = ''
+            tableam = None
         if self.version >= (1, 16, 0):
             relkind_val = self._read_int()
             relkind = chr(relkind_val) if relkind_val else None
@@ -1082,11 +1087,15 @@ class Dump:
         """
         if self._handle is None:
             raise ValueError('File handle is not initialized')
-        out = value.encode(self.encoding) if value else b''
-        self._write_int(len(out))
-        if out:
-            LOGGER.debug('Writing %r', out)
-            self._handle.write(out)
+        if value is None:
+            # Write -1 length to indicate "not set" rather than "empty string"
+            self._write_int(-1)
+        else:
+            out = value.encode(self.encoding)
+            self._write_int(len(out))
+            if out:
+                LOGGER.debug('Writing %r', out)
+                self._handle.write(out)
 
     def _write_table_data(self, dump_id: int) -> int:
         """Write the blobs for the entry, returning the # of bytes written
