@@ -21,7 +21,7 @@ def load(
     filepath: str | pathlib.Path,
     converter: typing.Any = None,
 ) -> 'dump.Dump':
-    """Load a pg_dump file created with -Fd from disk
+    """Load a pg_dump file created with -Fc from disk
 
     :param filepath: The path to the dump to load
     :type filepath: str or pathlib.Path
