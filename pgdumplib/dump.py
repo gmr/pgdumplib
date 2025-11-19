@@ -713,8 +713,29 @@ class Dump:
         """
         if self._handle is None:
             raise ValueError('File handle is not initialized')
-        if self._handle.read(5) != constants.MAGIC:
-            raise ValueError('Invalid archive header')
+        magic_bytes = self._handle.read(5)
+        if magic_bytes != constants.MAGIC:
+            # Provide helpful error messages based on file content
+            error_msg = 'Invalid archive header'
+            try:
+                # Try to detect plain SQL files
+                file_start = magic_bytes.decode('ascii', errors='ignore')
+                if file_start.startswith(('--', '/*', 'SE', 'CR', 'IN', 'DR')):
+                    error_msg = (
+                        'This appears to be a plain SQL text file. '
+                        'pgdumplib only supports custom format dumps '
+                        'created with pg_dump -Fc'
+                    )
+                elif len(file_start) == 0 or not file_start.isprintable():
+                    error_msg = (
+                        'Invalid archive format. '
+                        'pgdumplib only supports custom format dumps '
+                        'created with pg_dump -Fc'
+                    )
+            except (UnicodeDecodeError, AttributeError):
+                # Ignore errors from decode or isprintable on invalid data
+                pass
+            raise ValueError(error_msg)
         self._vmaj = struct.unpack('B', self._handle.read(1))[0]
         self._vmin = struct.unpack('B', self._handle.read(1))[0]
         self._vrev = struct.unpack('B', self._handle.read(1))[0]

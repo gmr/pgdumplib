@@ -190,6 +190,53 @@ class ErrorsTestCase(unittest.TestCase):
             with self.assertRaises(ValueError):
                 pgdumplib.load(temp.name)
 
+    def test_plain_sql_file_with_comment(self):
+        """Test plain SQL files with comments get helpful error message"""
+        with tempfile.NamedTemporaryFile(
+            'w', delete=False, suffix='.sql'
+        ) as temp:
+            temp.write('-- PostgreSQL database dump\n')
+            temp.write('CREATE TABLE test (id INT);\n')
+            temp_name = temp.name
+
+        try:
+            with self.assertRaises(ValueError) as context:
+                pgdumplib.load(temp_name)
+            self.assertIn('plain SQL text file', str(context.exception))
+            self.assertIn('pg_dump -Fc', str(context.exception))
+        finally:
+            os.unlink(temp_name)
+
+    def test_plain_sql_file_with_create(self):
+        """Test plain SQL files starting with CREATE get helpful error"""
+        with tempfile.NamedTemporaryFile(
+            'w', delete=False, suffix='.sql'
+        ) as temp:
+            temp.write('CREATE DATABASE test;\n')
+            temp_name = temp.name
+
+        try:
+            with self.assertRaises(ValueError) as context:
+                pgdumplib.load(temp_name)
+            self.assertIn('plain SQL text file', str(context.exception))
+            self.assertIn('pg_dump -Fc', str(context.exception))
+        finally:
+            os.unlink(temp_name)
+
+    def test_invalid_binary_format(self):
+        """Test that invalid binary formats get a helpful error message"""
+        with tempfile.NamedTemporaryFile('wb', delete=False) as temp:
+            temp.write(b'\x00\x01\x02\x03\x04')
+            temp_name = temp.name
+
+        try:
+            with self.assertRaises(ValueError) as context:
+                pgdumplib.load(temp_name)
+            self.assertIn('Invalid archive', str(context.exception))
+            self.assertIn('pg_dump -Fc', str(context.exception))
+        finally:
+            os.unlink(temp_name)
+
 
 class NewDumpTestCase(unittest.TestCase):
     def test_pgdumplib_new(self):
