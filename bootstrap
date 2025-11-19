@@ -121,7 +121,7 @@ printf "Generating fixture data ... "
 if test "${CI}" = 'true'
 then
 	# In CI, connect to localhost since port is exposed from service container
-	python bin/generate-fixture-data.py -U postgres -h localhost -p 5432 -d postgres
+	PGPASSWORD=postgres python bin/generate-fixture-data.py -U postgres -h localhost -p 5432 -d postgres
 else
 	python bin/generate-fixture-data.py -U postgres -h "${TEST_HOST}" -p "${PGPORT}" -d postgres
 fi
