@@ -60,7 +60,7 @@ then
 	then
 		. ./.venv/bin/activate
 	else
-		python3.12 -m venv --upgrade-deps .venv
+		python3 -m venv --upgrade-deps .venv
 		. ./.venv/bin/activate
 	fi
 fi

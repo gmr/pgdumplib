@@ -100,11 +100,11 @@ example = dump.add_entry(
     'DROP TABLE public.example')
 
 with dump.table_data_writer(example, ['id', 'created_at', 'value']) as writer:
-    writer.append(uuid.uuid4(), datetime.datetime.utcnow(), 'row1')
-    writer.append(uuid.uuid4(), datetime.datetime.utcnow(), 'row2')
-    writer.append(uuid.uuid4(), datetime.datetime.utcnow(), 'row3')
-    writer.append(uuid.uuid4(), datetime.datetime.utcnow(), 'row4')
-    writer.append(uuid.uuid4(), datetime.datetime.utcnow(), 'row5')
+    writer.append(uuid.uuid4(), datetime.datetime.now(datetime.UTC), 'row1')
+    writer.append(uuid.uuid4(), datetime.datetime.now(datetime.UTC), 'row2')
+    writer.append(uuid.uuid4(), datetime.datetime.now(datetime.UTC), 'row3')
+    writer.append(uuid.uuid4(), datetime.datetime.now(datetime.UTC), 'row4')
+    writer.append(uuid.uuid4(), datetime.datetime.now(datetime.UTC), 'row5')
 
 dump.save('custom.dump')
 ```

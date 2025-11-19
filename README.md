@@ -1,6 +1,6 @@
 # pgdumplib
 
-Python3 library for reading and writing pg_dump files using the custom format.
+Python 3 library for reading and writing pg_dump files using the custom format.
 
 [![Version](https://img.shields.io/pypi/v/pgdumplib.svg)](https://pypi.python.org/pypi/pgdumplib)
 [![Status](https://github.com/gmr/pgdumplib/workflows/Testing/badge.svg)](https://github.com/gmr/pgdumplib/actions)
