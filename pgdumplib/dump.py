@@ -415,7 +415,7 @@ class Dump:
         :type path: str or os.PathLike
 
         """
-        if getattr(self, '_handle', None) and not self._handle.closed:
+        if self._handle is not None and not self._handle.closed:
             self._handle.close()
         self.compression_algorithm = constants.COMPRESSION_NONE
         self._handle = open(path, 'wb')
