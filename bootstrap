@@ -118,7 +118,7 @@ docker_exec /usr/bin/psql -U postgres -d postgres -q -o /dev/null -f /fixtures/s
 echo ' done.'
 
 printf "Generating fixture data ... "
-python3 bin/generate-fixture-data.py -U postgres -h "${TEST_HOST}" -p "${PGPORT}" -d postgres
+python bin/generate-fixture-data.py -U postgres -h "${TEST_HOST}" -p "${PGPORT}" -d postgres
 echo ' done.'
 
 printf "Creating test backups ... "
