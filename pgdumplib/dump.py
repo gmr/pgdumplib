@@ -272,8 +272,8 @@ class Dump:
                 drop_stmt=drop_stmt or '',
                 copy_stmt=copy_stmt or '',
                 namespace=namespace or '',
-                tablespace=tablespace or '',
-                tableam=tableam or '',
+                tablespace=tablespace or None,
+                tableam=tableam or None,
                 relkind=None,
                 owner=owner or '',
                 with_oids=False,
@@ -669,10 +669,15 @@ class Dump:
         copy_stmt = self._read_bytes().decode(self.encoding)
         namespace = self._read_bytes().decode(self.encoding)
         tablespace = self._read_bytes().decode(self.encoding)
+        # Normalize empty strings to None for consistency
+        tablespace = tablespace if tablespace else None
         if self.version >= (1, 14, 0):
             tableam = self._read_bytes().decode(self.encoding)
+            # Normalize empty strings to None to prevent invalid SQL
+            # generation (e.g., SET default_table_access_method = "";)
+            tableam = tableam if tableam else None
         else:
-            tableam = ''
+            tableam = None
         if self.version >= (1, 16, 0):
             relkind_val = self._read_int()
             relkind = chr(relkind_val) if relkind_val else None
@@ -713,8 +718,33 @@ class Dump:
         """
         if self._handle is None:
             raise ValueError('File handle is not initialized')
-        if self._handle.read(5) != constants.MAGIC:
-            raise ValueError('Invalid archive header')
+        magic_bytes = self._handle.read(5)
+        if magic_bytes != constants.MAGIC:
+            # Provide helpful error messages based on file content
+            error_msg = (
+                'Invalid archive header. '
+                'pgdumplib only supports custom format dumps '
+                'created with pg_dump -Fc'
+            )
+            try:
+                # Try to detect plain SQL files
+                file_start = magic_bytes.decode('ascii', errors='ignore')
+                if file_start.startswith(('--', '/*', 'SE', 'CR', 'IN', 'DR')):
+                    error_msg = (
+                        'This appears to be a plain SQL text file. '
+                        'pgdumplib only supports custom format dumps '
+                        'created with pg_dump -Fc'
+                    )
+                elif len(file_start) == 0 or not file_start.isprintable():
+                    error_msg = (
+                        'Invalid archive format. '
+                        'pgdumplib only supports custom format dumps '
+                        'created with pg_dump -Fc'
+                    )
+            except (UnicodeDecodeError, AttributeError):
+                # Ignore errors from decode or isprintable on invalid data
+                pass
+            raise ValueError(error_msg)
         self._vmaj = struct.unpack('B', self._handle.read(1))[0]
         self._vmin = struct.unpack('B', self._handle.read(1))[0]
         self._vrev = struct.unpack('B', self._handle.read(1))[0]
@@ -1054,18 +1084,23 @@ class Dump:
         return saved
 
     def _write_str(self, value: str | None) -> None:
-        """Write a string
+        """Write a string or NULL marker
 
-        :param str value: The string to write
+        :param value: The string to write, or None to write -1 length
+            (indicating an unset/NULL field in the archive format)
 
         """
         if self._handle is None:
             raise ValueError('File handle is not initialized')
-        out = value.encode(self.encoding) if value else b''
-        self._write_int(len(out))
-        if out:
-            LOGGER.debug('Writing %r', out)
-            self._handle.write(out)
+        if value is None:
+            # Write -1 length to indicate "not set" rather than "empty string"
+            self._write_int(-1)
+        else:
+            out = value.encode(self.encoding)
+            self._write_int(len(out))
+            if out:
+                LOGGER.debug('Writing %r', out)
+                self._handle.write(out)
 
     def _write_table_data(self, dump_id: int) -> int:
         """Write the blobs for the entry, returning the # of bytes written
