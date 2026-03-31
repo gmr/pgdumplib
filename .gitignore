@@ -2,6 +2,8 @@
 *.egg-info
 *.pyc
 *.pyo
+*.so
+*.pyd
 .coverage
 .mypy_cache
 .idea
@@ -11,3 +13,5 @@ dist/
 env/
 docs/_build
 site/
+target/
+*.dSYM/

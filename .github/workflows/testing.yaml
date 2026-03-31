@@ -44,6 +44,9 @@ jobs:
         with:
           python-version: '${{ matrix.python }}'
 
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
       - name: Set Timezone
         uses: szenius/set-timezone@v2.0
         with:
@@ -78,6 +81,11 @@ jobs:
         run: |
           # Copy generated dump files back to workspace for tests
           docker cp postgres:/data/. build/data/
+
+      - name: Build native extension
+        run: |
+          .venv/bin/pip install maturin
+          .venv/bin/maturin develop
 
       - name: Lint Check
         run: pre-commit run --all-files
