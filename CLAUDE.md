@@ -10,7 +10,7 @@ pgdumplib is a Python3 library for reading and writing PostgreSQL pg_dump files 
 - Create new pg_dump files programmatically
 - Read table data with configurable data converters
 - Handle BLOB data
-- Manage dump entries with proper dependency resolution using topological sorting
+- Manage dump entries; entry ordering and dependency resolution are handled by the Rust layer
 
 ## Core Architecture
 
