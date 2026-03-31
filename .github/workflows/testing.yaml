@@ -44,6 +44,9 @@ jobs:
         with:
           python-version: '${{ matrix.python }}'
 
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
       - name: Set Timezone
         uses: szenius/set-timezone@v2.0
         with:
@@ -80,16 +83,16 @@ jobs:
           docker cp postgres:/data/. build/data/
 
       - name: Lint Check
-        run: pre-commit run --all-files
+        run: .venv/bin/pre-commit run --all-files
 
       - name: Run tests
         run: |
-          coverage run
-          coverage report
-          coverage xml
+          .venv/bin/coverage run
+          .venv/bin/coverage report
+          .venv/bin/coverage xml
 
       - name: Upload Coverage
         uses: codecov/codecov-action@v5
         with:
-          files: ./build/coverage.xml
+          files: ./build/reports/coverage.xml
           flags: unittests

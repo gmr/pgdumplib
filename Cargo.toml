@@ -1,0 +1,13 @@
+[package]
+name = "_pgdumplib"
+version = "5.0.0"
+edition = "2024"
+rust-version = "1.88"
+
+[lib]
+name = "_pgdumplib"
+crate-type = ["cdylib"]
+
+[dependencies]
+libpgdump = "2"
+pyo3 = { version = "0.28", features = ["extension-module"] }

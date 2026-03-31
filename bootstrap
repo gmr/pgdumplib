@@ -54,23 +54,21 @@ get_exposed_port() {
 	fi
 }
 
-if test "$CI" != 'true'
+if test -e ./.venv/bin/activate
 then
-	if test -e ./.venv/bin/activate
-	then
-		. ./.venv/bin/activate
-	else
-		python3 -m venv --upgrade-deps .venv
-		. ./.venv/bin/activate
-	fi
+	. ./.venv/bin/activate
+else
+	python3 -m venv --upgrade-deps .venv
+	. ./.venv/bin/activate
 fi
 
 mkdir -p build
 
 pip install --upgrade pip
 
-printf 'Installing package...'
-pip install -e '.[dev]'
+printf 'Installing maturin and dev dependencies...'
+pip install maturin
+maturin develop --extras dev
 echo ' done.'
 
 if test -d .git && test -f .pre-commit-config.yaml

@@ -13,20 +13,6 @@ K_VERSION_MAP = {
     ((17, 0), (99, 99)): (1, 16, 0),
 }
 
-BLK_DATA: bytes = b'\x01'
-BLK_BLOBS: bytes = b'\x03'
-
-EOF: int = -1
-
-FORMAT_UNKNOWN: int = 0
-FORMAT_CUSTOM: int = 1
-FORMAT_FILES: int = 2
-FORMAT_TAR: int = 3
-FORMAT_NULL: int = 4
-FORMAT_DIRECTORY: int = 5
-
-FORMATS: list[str] = ['Unknown', 'Custom', 'Files', 'Tar', 'Null', 'Directory']
-
 """Specifies the compression algorithm used"""
 COMPRESSION_NONE: str = 'none'
 COMPRESSION_GZIP: str = 'gzip'
@@ -41,6 +27,8 @@ COMPRESSION_ALGORITHMS: list[str] = [
 SUPPORTED_COMPRESSION_ALGORITHMS: list[str] = [
     COMPRESSION_NONE,
     COMPRESSION_GZIP,
+    COMPRESSION_LZ4,
+    COMPRESSION_ZSTD,
 ]
 
 K_OFFSET_POS_NOT_SET: int = 1
@@ -78,12 +66,6 @@ SECTIONS: list[str] = [
     SECTION_DATA,
     SECTION_POST_DATA,
 ]
-
-VERSION: tuple[int, int, int] = (1, 14, 0)
-"""pg_dump file format version to create by default"""
-
-ZLIB_OUT_SIZE: int = 4096
-ZLIB_IN_SIZE: int = 4096
 
 # Object Types
 
