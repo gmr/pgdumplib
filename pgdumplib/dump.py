@@ -274,6 +274,14 @@ class Dump:
     def load(self, path: str | os.PathLike) -> typing.Self:
         """Load the Dumpfile
 
+        .. note::
+            Loaded dumps are saved without compression by default,
+            regardless of the original compression setting. The
+            original compression algorithm is preserved for
+            inspection via :attr:`compression_algorithm`. Use
+            :meth:`set_compression` after loading to specify the
+            desired output compression.
+
         :param os.PathLike path: The path of the dump to load
         :raises: :py:exc:`RuntimeError`
         :raises: :py:exc:`ValueError`
@@ -381,31 +389,36 @@ class Dump:
             f'COPY {entry.namespace}.{entry.tag}'
             f' ({", ".join(columns)}) FROM stdin;\n'
         )
-        dump_id = self._dump.add_entry(
-            constants.TABLE_DATA,
-            namespace=entry.namespace or None,
-            tag=entry.tag or None,
-            owner=entry.owner or None,
-            copy_stmt=copy_stmt,
-            dependencies=[entry.dump_id],
+        # Reuse an existing TABLE DATA entry for this table if one
+        # exists, avoiding orphan entries on repeated calls.
+        existing = self._find_existing_table_data(
+            entry.namespace,
+            entry.tag,
         )
+        if existing is not None:
+            dump_id = existing
+        else:
+            dump_id = self._dump.add_entry(
+                constants.TABLE_DATA,
+                namespace=entry.namespace or None,
+                tag=entry.tag or None,
+                owner=entry.owner or None,
+                copy_stmt=copy_stmt,
+                dependencies=[entry.dump_id],
+            )
         writer = TableData(dump_id, self.encoding)
         yield writer
         data = writer.get_data()
-        # Append to existing entry data if this table was written before
-        existing = self._find_existing_table_data(
-            entry.namespace, entry.tag, dump_id
-        )
         if existing is not None:
             existing_data = self._dump.entry_data(existing)
             if existing_data:
                 data = bytes(existing_data) + data
-            self._dump.set_entry_data(existing, data)
-        else:
-            self._dump.set_entry_data(dump_id, data)
+        self._dump.set_entry_data(dump_id, data)
 
     def _find_existing_table_data(
-        self, namespace: str | None, tag: str | None, exclude_id: int
+        self,
+        namespace: str | None,
+        tag: str | None,
     ) -> int | None:
         """Find an existing TABLE DATA entry for the same table"""
         for entry in self._dump.entries:
@@ -413,7 +426,6 @@ class Dump:
                 entry.desc == constants.TABLE_DATA
                 and entry.namespace == namespace
                 and entry.tag == tag
-                and entry.dump_id != exclude_id
             ):
                 return entry.dump_id
         return None

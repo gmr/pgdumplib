@@ -35,7 +35,7 @@ pgdumplib is a Python3 library for reading and writing PostgreSQL pg_dump files 
 
 1. **Temporary File Management**: Table and blob data are stored in gzip-compressed temporary files that are automatically cleaned up when the Dump instance is released.
 
-2. **Dependency Resolution**: Entries have dependencies tracked via `dump_id` references. The library uses `toposort` to ensure proper ordering when writing dumps.
+2. **Dependency Resolution**: Entries have dependencies tracked via `dump_id` references. The Rust layer ensures proper ordering when writing dumps.
 
 3. **Binary Format Parsing**: The library implements the pg_dump custom format specification, handling magic bytes (`PGDMP`), versioning (supports versions 1.12.0-1.16.0), compression, and data blocks.
 
