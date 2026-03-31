@@ -18,7 +18,7 @@ pgdumplib is a Python3 library for reading and writing PostgreSQL pg_dump files 
 
 - **`pgdumplib/__init__.py`**: Public API surface — `pgdumplib.load()` and `pgdumplib.new()` are the main entry points.
 
-- **`pgdumplib/dump.py`**: Contains the `Dump` class (primary interface for loading, creating, and manipulating pg_dump files) and `TableData` class for managing table data via temporary gzip-compressed files.
+- **`pgdumplib/dump.py`**: Contains the `Dump` class (primary interface for loading, creating, and manipulating pg_dump files) and `TableData` class for buffering table data in an in-memory `io.BytesIO` buffer before writing it to the native dump via `get_data()`.
 
 - **`pgdumplib/models.py`**: Defines the `Entry` dataclass representing individual entries in a dump's table of contents (TOC). Entries contain metadata, DDL, dependencies, and data offsets.
 
@@ -33,7 +33,7 @@ pgdumplib is a Python3 library for reading and writing PostgreSQL pg_dump files 
 
 ### Key Design Patterns
 
-1. **Temporary File Management**: Table and blob data are stored in gzip-compressed temporary files that are automatically cleaned up when the Dump instance is released.
+1. **In-Memory Data Buffering**: Table data is buffered in `io.BytesIO` via the `TableData` class and materialized when `get_data()` is called. Blob and table data are managed by the native Rust backend.
 
 2. **Dependency Resolution**: Entries have dependencies tracked via `dump_id` references. The Rust layer ensures proper ordering when writing dumps.
 

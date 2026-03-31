@@ -232,8 +232,7 @@ class ErrorsTestCase(unittest.TestCase):
         try:
             with self.assertRaises(ValueError) as context:
                 pgdumplib.load(temp_name)
-            self.assertIn('Invalid archive', str(context.exception))
-            self.assertIn('pg_dump -Fc', str(context.exception))
+            self.assertIn('invalid magic bytes', str(context.exception))
         finally:
             os.unlink(temp_name)
 

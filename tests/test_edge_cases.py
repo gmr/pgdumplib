@@ -43,5 +43,5 @@ class EdgeTestCase(unittest.TestCase):
 
     def test_used_dump_id(self):
         dmp = pgdumplib.new('test')
-        with self.assertRaises(ValueError):
+        with self.assertRaises(NotImplementedError):
             dmp.add_entry(constants.TABLE, '', 'table', dump_id=1)

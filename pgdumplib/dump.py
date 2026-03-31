@@ -150,7 +150,7 @@ class Dump:
 
     @format.setter
     def format(self, value: str) -> None:
-        self._format = value
+        self.set_format(value)
 
     @property
     def server_version(self) -> str:
@@ -224,6 +224,13 @@ class Dump:
 
         if dump_id is not None and dump_id < 1:
             raise ValueError('dump_id must be greater than 1')
+
+        # TODO: Pass dump_id through to _dump.add_entry once the Rust
+        # backend supports it, then remove this guard.
+        if dump_id is not None:
+            raise NotImplementedError(
+                'Custom dump_id is not yet supported by the Rust backend'
+            )
 
         existing_ids = self._dump.entry_dump_ids()
 
@@ -396,6 +403,14 @@ class Dump:
             entry.tag,
         )
         if existing is not None:
+            existing_entry = self._dump.get_entry(existing)
+            if (
+                existing_entry is not None
+                and existing_entry.copy_stmt != copy_stmt
+            ):
+                raise ValueError(
+                    'columns must match the existing TABLE DATA entry'
+                )
             dump_id = existing
         else:
             dump_id = self._dump.add_entry(
@@ -457,10 +472,8 @@ class Dump:
         except UnicodeDecodeError:
             pass
 
-        raise ValueError(
-            'Invalid archive file format. '
-            'Use pg_dump -Fc to create a custom format dump.'
-        )
+        # Allow unknown binary formats (e.g., tar archives) to pass
+        # through to the Rust backend for handling
 
     def _detect_encoding(self) -> None:
         """Detect the encoding from the dump's ENCODING entry"""
