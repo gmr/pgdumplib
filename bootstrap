@@ -54,15 +54,12 @@ get_exposed_port() {
 	fi
 }
 
-if test "$CI" != 'true'
+if test -e ./.venv/bin/activate
 then
-	if test -e ./.venv/bin/activate
-	then
-		. ./.venv/bin/activate
-	else
-		python3 -m venv --upgrade-deps .venv
-		. ./.venv/bin/activate
-	fi
+	. ./.venv/bin/activate
+else
+	python3 -m venv --upgrade-deps .venv
+	. ./.venv/bin/activate
 fi
 
 mkdir -p build

@@ -82,22 +82,17 @@ jobs:
           # Copy generated dump files back to workspace for tests
           docker cp postgres:/data/. build/data/
 
-      - name: Build native extension
-        run: |
-          .venv/bin/pip install maturin
-          .venv/bin/maturin develop
-
       - name: Lint Check
-        run: pre-commit run --all-files
+        run: .venv/bin/pre-commit run --all-files
 
       - name: Run tests
         run: |
-          coverage run
-          coverage report
-          coverage xml
+          .venv/bin/coverage run
+          .venv/bin/coverage report
+          .venv/bin/coverage xml
 
       - name: Upload Coverage
         uses: codecov/codecov-action@v5
         with:
-          files: ./build/coverage.xml
+          files: ./build/reports/coverage.xml
           flags: unittests
